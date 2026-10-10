@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import EmailStr, Field, model_validator
+from pydantic import ConfigDict, EmailStr, Field, model_validator
 from pydantic.types import StringConstraints
 
 from app.schemas.base import BaseSchema, ObjectIdStr
@@ -96,6 +96,15 @@ class UserResponse(BaseSchema):
 
 
 class UserRegisterRequest(BaseSchema):
+    """Request payload for POST /auth/register.
+
+    ``extra="forbid"``: registration is the most security-sensitive
+    mass-assignment surface — a privilege field such as ``role`` or ``status``
+    in the payload must be rejected (422), never silently ignored.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
     email: EmailStr = Field(..., description="User email address")
     phone: Annotated[str, StringConstraints(pattern=r"^\+[1-9]\d{1,14}$")] = Field(
         ..., description="User phone number in E.164 format"
@@ -116,8 +125,11 @@ class UserRegisterResponse(BaseSchema):
 
 
 class UserLoginRequest(BaseSchema):
-    identifier: str = Field(..., description="Email or phone number")
-    password: str = Field(..., min_length=8, max_length=128, description="User password")
+    identifier: str = Field(..., min_length=1, max_length=256, description="Email or phone number")
+    # Do NOT enforce min_length on the login password field: a password that is
+    # too short is still an invalid credential and must produce a 401 (not 422).
+    # An attacker must not be able to infer policy violations vs wrong creds.
+    password: str = Field(..., max_length=256, description="User password")
 
 
 class UserLoginResponse(BaseSchema):

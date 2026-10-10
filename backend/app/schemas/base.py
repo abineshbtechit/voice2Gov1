@@ -10,18 +10,28 @@ from pydantic_core import CoreSchema
 
 class ObjectIdStr(str):
     @classmethod
-    def __get_pydantic_json_schema__(
-        cls, core_schema_obj: CoreSchema, handler: Callable[[CoreSchema], CoreSchema]
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: Callable[[Any], CoreSchema]
     ) -> CoreSchema:
-        return handler(core_schema.str_schema())
+        return core_schema.with_info_plain_validator_function(
+            function=cls._validate,
+            json_schema_input_schema=core_schema.str_schema(),
+            serialization=core_schema.to_string_ser_schema(),
+        )
 
     @classmethod
-    def validate(cls, v: Any) -> str:
+    def _validate(cls, v: Any, _info: Any) -> str:
         if isinstance(v, ObjectId):
             return str(v)
         if isinstance(v, str) and ObjectId.is_valid(v):
             return v
         raise ValueError("Invalid ObjectId")
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema_obj: CoreSchema, handler: Callable[[CoreSchema], CoreSchema]
+    ) -> CoreSchema:
+        return handler(core_schema.str_schema())
 
 
 class BaseSchema(BaseModel):

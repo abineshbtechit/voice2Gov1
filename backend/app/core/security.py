@@ -44,8 +44,12 @@ def validate_password_policy(password: str) -> tuple[bool, list[str]]:
     if len(password) < 8:
         errors.append("Password must be at least 8 characters long")
 
-    if len(password) > 128:
-        errors.append("Password must not exceed 128 characters")
+    # bcrypt raises ValueError for passwords longer than 72 bytes ("truncate
+    # manually if necessary"), which would surface as an unhandled 500 during
+    # registration. Enforce the bcrypt byte limit here so overly long
+    # passwords produce a validation error (422) instead of a server error.
+    if len(password.encode("utf-8")) > 72:
+        errors.append("Password must not exceed 72 bytes")
 
     # Check for at least one uppercase letter
     if not any(c.isupper() for c in password):

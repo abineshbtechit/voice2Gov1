@@ -108,6 +108,11 @@ INDEXES: dict[str, list[tuple[list[tuple[str, int | str]], dict[str, Any]]]] = {
         ([("expires_at", ASCENDING)], {"expireAfterSeconds": 0, "name": "idx_token_expires_at_ttl"}),
         ([("user_id", ASCENDING), ("revoked_at", ASCENDING)], {"name": "idx_token_user_revoked"}),
     ],
+    "password_reset_otps": [
+        ([("identifier", ASCENDING)], {"name": "idx_otps_identifier"}),
+        ([("expires_at", ASCENDING)], {"expireAfterSeconds": 0, "name": "idx_otps_expires_at_ttl"}),
+        ([("reset_token_hash", ASCENDING)], {"name": "idx_otps_reset_token_hash"}),
+    ],
 }
 
 

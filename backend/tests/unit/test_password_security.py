@@ -93,15 +93,26 @@ class TestPasswordPolicy:
         assert is_valid is True
 
     def test_maximum_length_enforced(self) -> None:
-        long_password = "A" * 126 + "a1!"  # 129 characters
-        assert len(long_password) == 129
+        # bcrypt raises ValueError above 72 bytes, which previously surfaced as
+        # an unhandled 500 during registration; the policy now caps at 72 bytes.
+        long_password = "A" * 70 + "a1!"  # 73 bytes
+        assert len(long_password.encode("utf-8")) == 73
         is_valid, errors = validate_password_policy(long_password)
         assert is_valid is False
-        assert any("128" in e for e in errors)
+        assert any("72" in e for e in errors)
 
-    def test_one_hundred_28_characters_passes(self) -> None:
+    def test_one_hundred_28_characters_rejected(self) -> None:
+        # A 128-character ASCII password is 128 bytes > bcrypt's 72-byte limit;
+        # it must be rejected by policy, not crash hash_password with a 500.
         ok_password = "A" * 125 + "a1!"
         assert len(ok_password) == 128
+        is_valid, errors = validate_password_policy(ok_password)
+        assert is_valid is False
+        assert any("72" in e for e in errors)
+
+    def test_exactly_72_bytes_passes(self) -> None:
+        ok_password = "A" * 69 + "a1!"  # exactly 72 bytes
+        assert len(ok_password.encode("utf-8")) == 72
         is_valid, errors = validate_password_policy(ok_password)
         assert is_valid is True
 

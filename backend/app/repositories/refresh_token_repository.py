@@ -63,3 +63,16 @@ class RefreshTokenRepository:
             {"$set": {"revoked_at": revoked_at, "reuse_detected": reuse_detected}},
         )
         return int(result.modified_count)
+
+    async def revoke_all_for_user(
+        self,
+        user_id: str,
+        revoked_at: datetime,
+    ) -> int:
+        """Revoke all active refresh tokens and sessions for a user (e.g. on password reset)."""
+        result = await self._collection.update_many(
+            {"user_id": str(user_id), "revoked_at": None},
+            {"$set": {"revoked_at": revoked_at, "reason": "password_reset"}},
+        )
+        return int(result.modified_count)
+

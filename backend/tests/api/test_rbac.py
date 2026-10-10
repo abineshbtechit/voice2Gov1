@@ -59,13 +59,17 @@ class TestAdminDashboardEndpoint:
         return create_access_token(user_id=user_id, role=role.value)
 
     def _seed_user(self, repository: FakeUserRepository, role: UserRole) -> str:
-        user_id = f"{role.value}123"
-        repository.seed(
-            user_id=user_id,
+        # Use the returned user_id from seed (which may be a generated ObjectId)
+        org_id = "507f1f77bcf86cd799439012" if role != UserRole.CITIZEN and role != UserRole.ADMIN else None
+        dept_id = "507f1f77bcf86cd799439014" if role == UserRole.ORGANIZATION_STAFF else None
+        user_id = repository.seed(
+            user_id=f"{role.value}123",
             email=f"{role.value}@example.com",
             phone="+15550000000",
             role=role.value,
             status="active",
+            organization_id=org_id,
+            department_id=dept_id,
         )
         return user_id
 
@@ -130,13 +134,16 @@ class TestOrganizationAdminDashboardEndpoint:
         return create_access_token(user_id=user_id, role=role.value)
 
     def _seed_user(self, repository: FakeUserRepository, role: UserRole) -> str:
-        user_id = f"{role.value}123"
-        repository.seed(
-            user_id=user_id,
+        org_id = "507f1f77bcf86cd799439012" if role != UserRole.CITIZEN and role != UserRole.ADMIN else None
+        dept_id = "507f1f77bcf86cd799439014" if role == UserRole.ORGANIZATION_STAFF else None
+        user_id = repository.seed(
+            user_id=f"{role.value}123",
             email=f"{role.value}@example.com",
             phone="+15550000000",
             role=role.value,
             status="active",
+            organization_id=org_id,
+            department_id=dept_id,
         )
         return user_id
 
@@ -183,13 +190,16 @@ class TestOrganizationStaffEndpoint:
         return create_access_token(user_id=user_id, role=role.value)
 
     def _seed_user(self, repository: FakeUserRepository, role: UserRole) -> str:
-        user_id = f"{role.value}123"
-        repository.seed(
-            user_id=user_id,
+        org_id = "507f1f77bcf86cd799439012" if role != UserRole.CITIZEN and role != UserRole.ADMIN else None
+        dept_id = "507f1f77bcf86cd799439014" if role == UserRole.ORGANIZATION_STAFF else None
+        user_id = repository.seed(
+            user_id=f"{role.value}123",
             email=f"{role.value}@example.com",
             phone="+15550000000",
             role=role.value,
             status="active",
+            organization_id=org_id,
+            department_id=dept_id,
         )
         return user_id
 
@@ -225,13 +235,16 @@ class TestAuthMeEndpointStillWorks:
         return create_access_token(user_id=user_id, role=role.value)
 
     def _seed_user(self, repository: FakeUserRepository, role: UserRole) -> str:
-        user_id = f"{role.value}123"
-        repository.seed(
-            user_id=user_id,
+        org_id = "507f1f77bcf86cd799439012" if role != UserRole.CITIZEN and role != UserRole.ADMIN else None
+        dept_id = "507f1f77bcf86cd799439014" if role == UserRole.ORGANIZATION_STAFF else None
+        user_id = repository.seed(
+            user_id=f"{role.value}123",
             email=f"{role.value}@example.com",
             phone="+15550000000",
             role=role.value,
             status="active",
+            organization_id=org_id,
+            department_id=dept_id,
         )
         return user_id
 
@@ -271,10 +284,9 @@ class TestPrivilegeEscalation:
 
     async def test_citizen_cannot_use_admin_token(self, client: AsyncClient, repository: FakeUserRepository) -> None:
         """A citizen user cannot obtain admin access by manipulating their token."""
-        # Seed a citizen user
-        citizen_id = "citizen123"
-        repository.seed(
-            user_id=citizen_id,
+        # Seed a citizen user with valid ObjectId
+        citizen_id = repository.seed(
+            user_id="citizen123",
             email="citizen@example.com",
             phone="+15551234567",
             role="citizen",
@@ -282,7 +294,7 @@ class TestPrivilegeEscalation:
         )
 
         # Create a token claiming to be admin (but signed with correct secret)
-        # This token will have sub=citizen123 but role=admin
+        # This token will have sub=citizen_id but role=admin
         fake_admin_token = create_access_token(user_id=citizen_id, role=UserRole.ADMIN.value)
 
         # The get_current_user loads the user from DB by sub, so the DB role (citizen) is used
@@ -291,9 +303,9 @@ class TestPrivilegeEscalation:
 
     async def test_token_tampering_fails(self, client: AsyncClient, repository: FakeUserRepository) -> None:
         """Tampering with JWT payload must fail signature verification (401)."""
-        user_id = "admin123"
-        repository.seed(
-            user_id=user_id,
+        # Seed an admin user with valid ObjectId
+        admin_id = repository.seed(
+            user_id="admin123",
             email="admin@example.com",
             phone="+15550000000",
             role="admin",
@@ -301,7 +313,7 @@ class TestPrivilegeEscalation:
         )
 
         # Create a valid admin token
-        valid_token = create_access_token(user_id=user_id, role=UserRole.ADMIN.value)
+        valid_token = create_access_token(user_id=admin_id, role=UserRole.ADMIN.value)
 
         # Tamper with the payload (from tests/fakes.py tamper_token helper)
         from tests.fakes import tamper_token

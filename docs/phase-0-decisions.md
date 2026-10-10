@@ -188,15 +188,18 @@ This document records key architectural decisions made during Phase 0, with rati
 
 **Decision**:
 - Store metadata in complaint_images collection
-- Pluggable storage provider (Local/S3/GridFS/MinIO)
-- Signed URLs for secure access
-- Validation: MIME, magic bytes, size, filename sanitization
+- Pluggable storage provider abstraction (StorageProvider) supporting Local/In-Memory for development & testing, and S3/MinIO for production
+- Phase 1: LocalStorageProvider (development) and InMemoryStorageProvider (automated testing) implemented behind StorageProvider
+- Production deployment phase: S3StorageProvider / MinIO integrated via boto3/aioboto3 without changing business logic
+- Signed URLs for secure access (HMAC-SHA256 signed URLs in development/test, presigned S3 URLs in production)
+- Validation: MIME allow-list, magic bytes signature, size limits (MB), filename sanitization to prevent directory traversal
+- Dimensions (width, height): stored optionally in metadata; pixel-level decoding (4096x4096) deferred to avoid heavy C-library image dependencies (Pillow/libheif) in Phase 1
 
 **Rationale**:
 - MongoDB stores references, not blobs (performance)
-- Provider abstraction allows dev (local) vs prod (S3)
-- Signed URLs enforce authorization
-- Multi-layer validation prevents malicious uploads
+- Provider abstraction allows dev (local) vs prod (S3) without touching services or controllers
+- Signed URLs enforce authorization and time-limited access
+- Multi-layer validation (MIME + magic bytes + size + path sanitization) prevents malicious uploads without heavy image decoding libraries
 
 **Alternatives Considered**:
 - GridFS only: Simpler but less scalable
@@ -204,7 +207,7 @@ This document records key architectural decisions made during Phase 0, with rati
 - Direct S3 upload: Requires presigned POST, more client complexity
 
 **Consequences**:
-- Need storage provider implementation per environment
+- Need storage provider implementation per environment (Phase 1 uses Local/Memory; production deployment adds S3/MinIO)
 - Cleanup jobs for orphaned files
 - CDN integration for production
 

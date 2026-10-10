@@ -26,7 +26,12 @@ async def readiness_check() -> SuccessResponse:
             raise ServiceNotReadyException(
                 errors=[{"field": "mongodb", "message": "MongoDB connection failed", "code": "CONNECTION_FAILED"}],
             )
-    except Exception as e:
+    except ServiceNotReadyException:
+        raise
+    except Exception:
+        # Phase 1.8 hardening: never surface internal exception details (e.g.
+        # MongoDB connection URI) in the readiness response.  The full
+        # exception is still recorded by the server-side logger.
         raise ServiceNotReadyException(
-            errors=[{"field": "mongodb", "message": str(e), "code": "CONNECTION_ERROR"}],
+            errors=[{"field": "mongodb", "message": "Database check failed", "code": "CONNECTION_ERROR"}],
         )

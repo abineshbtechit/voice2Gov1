@@ -74,10 +74,10 @@ async def client(app, service, token_service):
 
 
 def seed_user(repository, user_id, email, role=UserRole.CITIZEN, status="active", password=VALID_PASSWORD):
-    """Seed a user with a known password hash."""
+    """Seed a user with a known password hash. Returns the actual ObjectId used."""
     from app.core.security import hash_password
     repo = repository
-    repo.seed(
+    valid_user_id = repo.seed(
         user_id,
         email=email,
         phone="+15551234567",
@@ -85,7 +85,7 @@ def seed_user(repository, user_id, email, role=UserRole.CITIZEN, status="active"
         status=status,
         password_hash=hash_password(password),
     )
-    return user_id
+    return valid_user_id
 
 
 def make_token(user_id, role):
@@ -400,10 +400,9 @@ class TestRateLimitHeaders:
 
     async def test_general_limiter_headers_show_1000(self, client, repository):
         """General API limiter headers show limit=1000."""
-        user_id = "general00000000000000000000001"
-        seed_user(repository, user_id, "general@example.com")
+        user_id = seed_user(repository, "general00000000000000000000001", "general@example.com")
 
-        response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {create_access_token(user_id=user_id, role='citizen')}"})
+        response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {make_token(user_id, UserRole.CITIZEN)}"})
         assert response.status_code == 200
         assert response.headers.get("X-RateLimit-Limit") == "1000"
 

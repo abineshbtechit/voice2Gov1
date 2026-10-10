@@ -24,7 +24,17 @@ from app.core.security import (
 from app.exceptions.base import UnauthorizedException
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.schemas.token import TokenPairResponse
+from app.schemas.user import UserStatus
 from app.services.user_service import UserService
+
+# Statuses that must never be able to mint a fresh access token, even with a
+# valid refresh token (Phase 1.8 hardening — defense in depth on top of the
+# access-time account-status check in the authentication dependency).
+_BLOCKED_STATUSES: frozenset[str] = frozenset({
+    UserStatus.SUSPENDED.value,
+    UserStatus.INACTIVE.value,
+    UserStatus.LOCKED.value,
+})
 
 
 class RefreshTokenService:
@@ -63,6 +73,13 @@ class RefreshTokenService:
         user = await self._user_service.get_user_by_id(payload.sub)
         if user is None:
             raise UnauthorizedException("Invalid refresh token", error_code="TOKEN_INVALID")
+
+        # Phase 1.8 hardening: a suspended, inactive or locked account must not
+        # be able to rotate a refresh token into a fresh access token. Generic
+        # message so the response does not reveal the account state.
+        status_val = user.status.value if hasattr(user.status, "value") else str(user.status)
+        if status_val in _BLOCKED_STATUSES:
+            raise UnauthorizedException("Account is not active", error_code="ACCOUNT_INACTIVE")
 
         token_hash = hash_refresh_token(refresh_token)
         now = datetime.now(UTC)

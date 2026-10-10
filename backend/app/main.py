@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.db.database import close_database, get_database, init_database
 from app.exceptions.handlers import register_exception_handlers
 from app.middleware.rate_limit import RateLimitHeadersMiddleware, RateLimitMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from scripts.create_indexes import create_indexes
 
 logging.basicConfig(
@@ -35,13 +36,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    docs_enabled = settings.debug or settings.environment.strip().lower() != "production"
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         description="Voice2Gov Civic Complaint Management Platform API",
         lifespan=lifespan,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        openapi_url="/openapi.json" if docs_enabled else None,
     )
 
     app.add_middleware(
@@ -51,6 +54,10 @@ def create_app() -> FastAPI:
         allow_methods=settings.cors_allow_methods,
         allow_headers=settings.cors_allow_headers,
     )
+
+    # Add security headers middleware (outermost - runs last, so headers are
+    # added to every response including error responses).
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Add rate limiting middleware
     app.add_middleware(
@@ -69,11 +76,13 @@ def create_app() -> FastAPI:
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict[str, str]:
-        return {
+        response: dict[str, str] = {
             "name": settings.app_name,
             "version": settings.app_version,
-            "docs": "/docs",
         }
+        if app.docs_url:
+            response["docs"] = app.docs_url
+        return response
 
     return app
 

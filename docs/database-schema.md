@@ -285,6 +285,14 @@ MongoDB collections for Voice2Gov civic complaint management platform. All colle
 - `uploaded_by` must have access to complaint
 - `complaint_id` required (no profile images in this collection)
 
+**Intentional SRS Deviations (Phase 1)**:
+- **Canonical image_type values**: `evidence`, `progress`, `completion` (Database Design SRS v1.0 conceptually noted `complaint_evidence`, `progress_evidence`, `completion_evidence`). A single unified enum is used across database, storage keys, and API contracts.
+- **storage_path vs storage_key**: Stored as `storage_path` containing the relative object storage key (e.g., `evidence/YYYY/MM/DD/{complaint_id}/{uuid}_{filename}`).
+- **original_filename vs file_name**: Stored as `original_filename` containing the sanitized original client filename.
+- **Dynamic Signed URLs vs file_url**: Expiring signed URLs are generated dynamically on read (`url`), rather than persisting static or leaking access URLs in `file_url`.
+- **Integrity and Audit fields**: `checksum` (SHA-256) and `is_deleted` (soft-delete flag) added to support upload compensation, integrity checks, and soft deletion.
+- **Caption deferred**: `caption` field from Database Design SRS is deferred to later UI integration phases; not stored or accepted in Phase 1.3.4.
+
 ---
 
 ## 7. complaint_likes Collection

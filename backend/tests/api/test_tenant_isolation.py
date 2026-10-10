@@ -8,11 +8,18 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.security import create_access_token
-from app.dependencies.services import get_user_service
+from app.dependencies.services import get_organization_service, get_user_service
 from app.main import create_app
 from app.schemas.user import UserRole
+from app.services.organization_service import OrganizationService
 from app.services.user_service import UserService
-from tests.fakes import FakeUserRepository
+from tests.fakes import (
+    FakeAuditLogRepository,
+    FakeComplaintLookup,
+    FakeDepartmentRepository,
+    FakeOrganizationRepository,
+    FakeUserRepository,
+)
 
 VALID_PASSWORD = "SecurePass123!"
 
@@ -46,6 +53,27 @@ def service(repository):
 @pytest.fixture
 async def client(app, service):
     app.dependency_overrides[get_user_service] = lambda: service
+    # Phase 1.8: the department-staff endpoint resolves the department through
+    # the tenant-isolated organization service, so the org/dept repositories
+    # are faked here (same convention as the other API test files) with the
+    # orgs/departments these tests reference.
+    org_repo = FakeOrganizationRepository()
+    dept_repo = FakeDepartmentRepository()
+    from datetime import UTC
+    from datetime import datetime as _dt
+    now = _dt.now(UTC)
+    org_repo.seed(ORG_A, name="Org A", code="ORGA", is_active=True, created_at=now, updated_at=now)
+    org_repo.seed(ORG_B, name="Org B", code="ORGB", is_active=True, created_at=now, updated_at=now)
+    dept_repo.seed(DEPT_A, organization_id=ORG_A, name="Dept A", code="DA", is_active=True, created_at=now, updated_at=now)
+    dept_repo.seed(DEPT_B, organization_id=ORG_B, name="Dept B", code="DB", is_active=True, created_at=now, updated_at=now)
+    org_service = OrganizationService(
+        org_repo=org_repo,
+        dept_repo=dept_repo,
+        user_repo=service._repository,
+        complaint_repo=FakeComplaintLookup(),
+        audit_repo=FakeAuditLogRepository(),
+    )
+    app.dependency_overrides[get_organization_service] = lambda: org_service
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
@@ -54,14 +82,12 @@ async def client(app, service):
 
 def _seed_org_user(repository: FakeUserRepository, role: UserRole, org_id: str, dept_id: str | None = None, suffix: str = "") -> str:
     """Seed a user with proper organization_id and department_id."""
-    base = f"{role.value}{suffix}{org_id[-6:]}"
-    if len(base) > 24:
-        user_id = base[:24]
-    elif len(base) < 24:
-        user_id = base.ljust(24, "0")
-    else:
-        user_id = base
-    repository.seed(
+    # Generate a valid ObjectId from a hash of the role, org_id, and suffix
+    import hashlib
+    base = f"{role.value}{suffix}{org_id}"
+    hash_bytes = hashlib.sha256(base.encode()).digest()[:12]
+    user_id = hash_bytes.hex()
+    return repository.seed(
         user_id=user_id,
         email=f"{role.value}{suffix}@{org_id[:4]}.example.com",
         phone="+15550000000",
@@ -70,30 +96,23 @@ def _seed_org_user(repository: FakeUserRepository, role: UserRole, org_id: str, 
         organization_id=org_id,
         department_id=dept_id,
     )
-    return user_id
 
 
 def _seed_citizen(repository: FakeUserRepository) -> str:
     """Seed a citizen user (no org)."""
-    user_id = "citizen0000000000000000000000"
-    repository.seed(
-        user_id=user_id,
+    return repository.seed(
+        user_id="507f1f77bcf86cd799439020",
         email="citizen@example.com",
         phone="+15551234567",
         role="citizen",
         status="active",
     )
-    return user_id
 
 
 def _seed_admin(repository: FakeUserRepository, org_id: str) -> str:
     """Seed an admin user with org_id."""
-    user_id = f"admin{org_id[-6:]}"
-    if len(user_id) > 24:
-        user_id = user_id[:24]
-    elif len(user_id) < 24:
-        user_id = user_id.ljust(24, "0")
-    repository.seed(
+    user_id = "507f1f77bcf86cd799439024"
+    return repository.seed(
         user_id=user_id,
         email=f"admin@{org_id[:4]}.example.com",
         phone="+15550000000",
@@ -101,17 +120,16 @@ def _seed_admin(repository: FakeUserRepository, org_id: str) -> str:
         status="active",
         organization_id=org_id,
     )
-    return user_id
 
 
 def _make_token(user_id: str, role: UserRole) -> str:
     return create_access_token(user_id=user_id, role=role.value)
 
 
-ORG_A = "orgA0000000000000000000000"
-ORG_B = "orgB0000000000000000000000"
-DEPT_A = "deptA0000000000000000000000"
-DEPT_B = "deptB0000000000000000000000"
+ORG_A = "507f1f77bcf86cd799439012"
+ORG_B = "507f1f77bcf86cd799439013"
+DEPT_A = "507f1f77bcf86cd799439014"
+DEPT_B = "507f1f77bcf86cd799439015"
 
 
 class TestOrganizationStaffEndpoint:
@@ -400,8 +418,8 @@ class TestRepositoryScopeVerification:
 
     async def test_find_by_id_in_organization_scopes_query(self, repository: FakeUserRepository) -> None:
         """Repository find_by_id_in_organization includes organization_id in query."""
-        user_id_a = "userA0000000000000000000000"
-        user_id_b = "userB0000000000000000000000"
+        user_id_a = "507f1f77bcf86cd799439040"
+        user_id_b = "507f1f77bcf86cd799439041"
 
         repository.seed(
             user_id=user_id_a,
@@ -431,7 +449,7 @@ class TestRepositoryScopeVerification:
     async def test_find_users_in_organization_scopes_query(self, repository: FakeUserRepository) -> None:
         """Repository find_users_in_organization includes organization_id in query."""
         repository.seed(
-            user_id="userA100000000000000000000",
+            user_id="507f1f77bcf86cd799439042",
             email="usera1@org-a.example.com",
             phone="+15550000000",
             role="organization_staff",
@@ -439,7 +457,7 @@ class TestRepositoryScopeVerification:
             organization_id=ORG_A,
         )
         repository.seed(
-            user_id="userA200000000000000000000",
+            user_id="507f1f77bcf86cd799439043",
             email="usera2@org-a.example.com",
             phone="+15550000001",
             role="organization_admin",
@@ -447,7 +465,7 @@ class TestRepositoryScopeVerification:
             organization_id=ORG_A,
         )
         repository.seed(
-            user_id="userB100000000000000000000",
+            user_id="507f1f77bcf86cd799439044",
             email="userb1@org-b.example.com",
             phone="+15550000002",
             role="organization_staff",
@@ -466,8 +484,8 @@ class TestRepositoryScopeVerification:
 
     async def test_update_in_organization_scopes_query(self, repository: FakeUserRepository) -> None:
         """Repository update_in_organization includes organization_id in query."""
-        user_id_a = "userA0000000000000000000000"
-        user_id_b = "userB0000000000000000000000"
+        user_id_a = "507f1f77bcf86cd799439045"
+        user_id_b = "507f1f77bcf86cd799439046"
 
         repository.seed(
             user_id=user_id_a,

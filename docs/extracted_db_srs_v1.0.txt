@@ -1,0 +1,987 @@
+
+
+=== [Page 1] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 1
+ Voice2Gov
+ Database Design Software Requirements Specification
+ Version 1.0
+Project
+Voice2Gov
+Document Type
+Database Design SRS
+Database
+MongoDB
+Backend
+Python + FastAPI
+Frontend
+React Native
+Database Architecture
+MongoDB Document Database
+Primary Users
+Citizens, Organization Staff, Organization Administrators, System Administrators
+ Prepared for project development, review, academic submission, and stakeholder
+ sharing.
+
+
+=== [Page 2] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 2
+Table of Contents
+ 1. Introduction
+ 2. Database Objectives
+ 3. Database Scope
+ 4. Database Technology
+ 5. Database Architecture
+ 6. Collection Catalogue
+ 7. Detailed Collection Specifications
+ 8. Collection Relationships
+ 9. Complaint Status Lifecycle
+ 10. Complaint Priority Data Model
+ 11. Indexing Requirements
+ 12. Data Integrity and Constraints
+ 13. File and Image Storage
+ 14. Security Requirements
+ 15. Database Query Requirements
+ 16. Data Flow
+ 17. Backup, Reliability and Performance
+ 18. Database Acceptance Criteria
+
+
+=== [Page 3] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 3
+1. Introduction
+This document defines the database-specific requirements for Voice2Gov. It is derived from the existing Voice2Gov
+Software Requirements Specification and isolates the MongoDB persistence design. The database supports citizen
+complaint registration, organization routing, department assignment, community likes, complaint progress tracking,
+notifications, administration, analytics, and auditability.
+2. Database Objectives
+ Store authenticated users and role information securely.
+ Store organizations, departments, and complaint categories.
+ Store complete civic complaint records including location and priority information.
+ Store complaint photographs and evidence metadata.
+ Prevent duplicate likes from the same user.
+ Preserve complaint status and progress history.
+ Deliver and track in-app and push notification data.
+ Record administrative and organization actions through audit logs.
+ Support geospatial complaint queries using MongoDB 2dsphere indexing.
+ Support indexed, paginated access for large complaint and notification datasets.
+3. Database Scope
+The database scope includes the 12 required MongoDB collections: users, organizations, departments, categories,
+complaints, complaint_images, complaint_likes, complaint_updates, notifications, device_tokens, audit_logs, and
+admin_settings. The original SRS identifies these collections as the recommended MongoDB design.
+■filecite■turn0file0■L767-L774■
+4. Database Technology
+ Layer
+Technology
+Purpose
+Database
+MongoDB
+Primary persistence layer
+Backend
+Python + FastAPI
+REST API, validation, business logic and database access
+Data Format
+JSON / BSON
+API and document representation
+Authentication
+JWT + RBAC
+Secure identity and authorization
+Image Storage
+Secure Object Storage / GridFS
+Complaint and progress photographs
+Location
+GeoJSON Point
+Complaint geospatial information
+5. Database Architecture
+Voice2Gov uses a document-oriented MongoDB database accessed by the Python FastAPI backend. Relationships
+are represented primarily through ObjectId references rather than relational SQL foreign keys. Complaint locations use
+GeoJSON Point format, and large image binaries should be kept in secure object storage or GridFS while MongoDB
+stores references and metadata. ■filecite■turn0file0■L255-L268■ ■filecite■turn0file0■L860-L862■
+6. Collection Catalogue
+
+
+=== [Page 4] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 4
+Collection
+Purpose
+users
+All authenticated citizens, organization administrators, organization staff and system
+administrators.
+organizations
+Government/civic organizations responsible for complaints.
+departments
+Departments belonging to organizations.
+categories
+Complaint category master data.
+complaints
+Core civic complaint records.
+complaint_images
+Complaint, progress and completion image metadata.
+complaint_likes
+Individual complaint upvotes/likes.
+complaint_updates
+Complaint status and progress history.
+notifications
+In-app notification records.
+device_tokens
+Push notification device registrations.
+audit_logs
+Security and administrative audit records.
+admin_settings
+Platform-level configurable settings.
+
+
+=== [Page 5] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 5
+7. Detailed Collection Specifications
+users
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique user identifier
+name
+string
+Yes
+Full name
+email
+string
+Yes / Unique
+Login email
+phone
+string
+No / Unique
+Mobile number
+password_hash
+string
+Yes
+Argon2/bcrypt hash; never plaintext
+role
+string
+Yes
+admin, organization_admin, organization_staff, citizen
+organization_id
+ObjectId
+Conditional
+Organization reference for organization users
+department_id
+ObjectId
+Conditional
+Department reference for staff
+status
+string
+Yes
+active, inactive, suspended, pending
+profile_image
+string
+No
+Secure profile image reference
+is_email_verified
+boolean
+No
+Email verification state
+is_phone_verified
+boolean
+No
+Phone verification state
+last_login_at
+date
+No
+Last successful login
+created_at
+date
+Yes
+Creation timestamp
+updated_at
+date
+Yes
+Last modification timestamp
+organizations
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique organization identifier
+name
+string
+Yes
+Organization name
+code
+string
+Yes / Unique
+Organization code
+description
+string
+No
+Description
+contact_email
+string
+No
+Contact email
+contact_phone
+string
+No
+Contact phone
+address
+string
+No
+Organization address
+status
+string
+Yes
+active or inactive
+created_at
+date
+Yes
+Creation timestamp
+updated_at
+date
+Yes
+Last modification timestamp
+departments
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique department identifier
+organization_id
+ObjectId
+Yes
+Reference to organizations
+name
+string
+Yes
+Department name
+code
+string
+Yes
+Department code within organization
+description
+string
+No
+Department description
+
+
+=== [Page 6] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 6
+Field
+Type
+Required
+Description
+status
+string
+Yes
+active or inactive
+created_at
+date
+Yes
+Creation timestamp
+updated_at
+date
+No
+Last modification timestamp
+categories
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique category identifier
+name
+string
+Yes
+Category name
+code
+string
+Yes / Unique
+Category code
+description
+string
+No
+Category description
+organization_id
+ObjectId
+No
+Optional organization-specific category
+default_department_id
+ObjectId
+No
+Default routing department
+priority_weight
+number
+No
+Default priority contribution
+status
+string
+Yes
+active or inactive
+created_at
+date
+Yes
+Creation timestamp
+updated_at
+date
+Yes
+Last modification timestamp
+complaints
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique complaint identifier
+complaint_number
+string
+Yes / Unique
+Human-readable complaint ID
+user_id
+ObjectId
+Yes
+Citizen who submitted complaint
+organization_id
+ObjectId
+Yes
+Routed organization
+department_id
+ObjectId
+Yes
+Routed department
+category_id
+ObjectId
+Yes
+Complaint category
+title
+string
+Yes
+Complaint title
+description
+string
+Yes
+Complaint description
+status
+string
+Yes
+SUBMITTED, ONGOING, PROCESSING, COMPLETED,
+REJECTED, DUPLICATE, CLOSED
+visibility
+string
+Yes
+public or private
+location
+object
+Yes
+GeoJSON Point: type + [longitude, latitude] + address
+likes_count
+integer
+Yes
+Denormalized community like count
+priority_score
+number
+Yes
+Overall complaint priority
+severity_score
+number
+No
+Severity contribution
+community_engagement_s
+core
+number
+No
+Community contribution
+age_score
+number
+No
+Age contribution
+assigned_to
+ObjectId
+No
+Assigned organization user
+assigned_at
+date
+No
+Assignment timestamp
+rejection_reason
+string
+No
+Reason for rejection
+
+
+=== [Page 7] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 7
+Field
+Type
+Required
+Description
+duplicate_of
+ObjectId
+No
+Reference to duplicate complaint
+completion_notes
+string
+No
+Resolution notes
+completed_at
+date
+No
+Completion timestamp
+created_at
+date
+Yes
+Submission timestamp
+updated_at
+date
+Yes
+Last modification timestamp
+complaint_images
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique image metadata identifier
+complaint_id
+ObjectId
+Yes
+Complaint reference
+uploaded_by
+ObjectId
+Yes
+User who uploaded image
+file_name
+string
+Yes
+Original/sanitized filename
+storage_key
+string
+Yes
+Secure object storage key or GridFS reference
+file_url
+string
+No
+Accessible secure URL where applicable
+mime_type
+string
+Yes
+Validated MIME type
+file_size
+integer
+Yes
+File size in bytes
+image_type
+string
+Yes
+complaint_evidence, progress_evidence,
+completion_evidence
+caption
+string
+No
+Optional caption
+created_at
+date
+Yes
+Upload timestamp
+complaint_likes
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique like identifier
+complaint_id
+ObjectId
+Yes
+Complaint reference
+user_id
+ObjectId
+Yes
+User reference
+created_at
+date
+Yes
+Like timestamp
+complaint_updates
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique update identifier
+complaint_id
+ObjectId
+Yes
+Complaint reference
+organization_id
+ObjectId
+Yes
+Organization reference
+department_id
+ObjectId
+No
+Department reference
+updated_by
+ObjectId
+Yes
+User who made update
+previous_status
+string
+No
+Previous complaint status
+new_status
+string
+No
+New complaint status
+message
+string
+No
+Progress/update message
+images
+array<ObjectId>
+No
+Related evidence image references
+created_at
+date
+Yes
+Update timestamp
+
+
+=== [Page 8] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 8
+notifications
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique notification identifier
+user_id
+ObjectId
+Yes
+Recipient user
+type
+string
+Yes
+Notification type
+title
+string
+Yes
+Notification title
+message
+string
+Yes
+Notification message
+complaint_id
+ObjectId
+No
+Related complaint
+is_read
+boolean
+Yes
+Read state
+read_at
+date
+No
+Read timestamp
+created_at
+date
+Yes
+Creation timestamp
+device_tokens
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique device-token record
+user_id
+ObjectId
+Yes
+Device owner
+token
+string
+Yes / Unique
+Push notification token
+platform
+string
+Yes
+android, ios, web
+device_id
+string
+No
+Device identifier
+is_active
+boolean
+Yes
+Whether token can receive notifications
+last_used_at
+date
+No
+Last token usage
+created_at
+date
+Yes
+Creation timestamp
+updated_at
+date
+Yes
+Last modification timestamp
+audit_logs
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique audit record
+actor_id
+ObjectId
+Yes
+User performing action
+actor_role
+string
+Yes
+Actor role
+action
+string
+Yes
+Action performed
+entity_type
+string
+Yes
+Entity affected
+entity_id
+ObjectId
+No
+Affected entity
+metadata
+object
+No
+Additional structured audit information
+ip_address
+string
+No
+Request IP where appropriate
+user_agent
+string
+No
+Client information
+created_at
+date
+Yes
+Audit timestamp
+admin_settings
+ Field
+Type
+Required
+Description
+_id
+ObjectId
+Yes
+Unique setting identifier
+
+
+=== [Page 9] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 9
+Field
+Type
+Required
+Description
+setting_key
+string
+Yes / Unique
+Configuration key
+setting_value
+mixed
+Yes
+Configuration value
+data_type
+string
+Yes
+string, number, boolean, object or array
+description
+string
+No
+Setting description
+updated_by
+ObjectId
+Yes
+Administrator who changed setting
+created_at
+date
+Yes
+Creation timestamp
+updated_at
+date
+Yes
+Last modification timestamp
+
+
+=== [Page 10] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 10
+8. Collection Relationships
+ Source
+Field
+Target
+Relationship
+users
+organization_id
+organizations._id
+Many-to-one
+users
+department_id
+departments._id
+Many-to-one
+departments
+organization_id
+organizations._id
+Many-to-one
+complaints
+user_id
+users._id
+Many-to-one
+complaints
+organization_id
+organizations._id
+Many-to-one
+complaints
+department_id
+departments._id
+Many-to-one
+complaints
+category_id
+categories._id
+Many-to-one
+complaints
+assigned_to
+users._id
+Many-to-one
+complaint_images
+complaint_id
+complaints._id
+Many-to-one
+complaint_likes
+complaint_id
+complaints._id
+Many-to-one
+complaint_likes
+user_id
+users._id
+Many-to-one
+complaint_updates
+complaint_id
+complaints._id
+Many-to-one
+notifications
+user_id
+users._id
+Many-to-one
+notifications
+complaint_id
+complaints._id
+Many-to-one
+device_tokens
+user_id
+users._id
+Many-to-one
+audit_logs
+actor_id
+users._id
+Many-to-one
+MongoDB relationships are implemented through ObjectId references and application-level validation rather than SQL
+foreign-key constraints.
+9. Complaint Status Lifecycle
+ SUBMITTED — complaint successfully registered.
+ ONGOING — organization has acknowledged the complaint and work has started.
+ PROCESSING — complaint is actively being investigated or resolved.
+ COMPLETED — work has been completed and the complaint is resolved.
+ REJECTED — complaint rejected with a reason.
+ DUPLICATE — complaint identified as a duplicate.
+ CLOSED — complaint lifecycle administratively closed.
+ Primary flow: SUBMITTED → ONGOING → PROCESSING → COMPLETED.
+The original SRS requires backend validation to prevent invalid transitions such as COMPLETED → SUBMITTED.
+■filecite■turn0file0■L304-L326■
+10. Complaint Priority Data Model
+The priority model combines community engagement, severity, complaint age, and organization-configured priority.
+The original SRS specifies configurable weighting so the formula can evolve without changing the mobile application.
+■filecite■turn0file0■L289-L302■
+Recommended stored components are priority_score, community_engagement_score, severity_score and age_score.
+Organization-specific weights can be maintained in admin_settings or organization configuration.
+
+
+=== [Page 11] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 11
+11. Indexing Requirements
+ Collection
+Index
+Purpose
+users
+email
+Fast login and unique email
+users
+phone
+Fast phone lookup
+complaints
+user_id
+Citizen complaint history
+complaints
+organization_id
+Organization isolation
+complaints
+department_id
+Department queue
+complaints
+status
+Status filtering
+complaints
+category_id
+Category filtering
+complaints
+created_at
+Recent complaints
+complaints
+priority_score
+Priority queue
+complaints
+location: 2dsphere
+Nearby complaints
+complaint_likes
+complaint_id + user_id
+Prevent duplicate likes
+notifications
+user_id + is_read
+Unread notification lookup
+complaint_updates
+complaint_id + created_at
+Complaint timeline
+These indexing requirements reflect the MongoDB indexing requirements in the original SRS.
+■filecite■turn0file0■L806-L835■
+12. Data Integrity and Constraints
+ User email must be unique.
+ Organization code must be unique.
+ Complaint number must be unique.
+ Complaint likes must use a unique compound index on complaint_id + user_id.
+ Complaint status must be restricted to the defined lifecycle values.
+ Invalid status transitions must be rejected by the backend.
+ Organization users must be restricted to their own organization records.
+ Required ObjectId references must be validated before insertion or update.
+ Coordinates must follow [longitude, latitude] GeoJSON ordering.
+ Timestamps should be stored consistently in UTC.
+13. File and Image Storage
+Complaint photographs, progress evidence, completion evidence, and profile images should be represented in
+MongoDB by metadata and secure storage references. The original SRS recommends secure object storage or
+GridFS. ■filecite■turn0file0■L246-L249■ ■filecite■turn0file0■L860-L862■
+14. Security Requirements
+ JWT access and refresh token architecture.
+ Argon2 or bcrypt password hashing.
+ Role-based authorization.
+
+
+=== [Page 12] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 12
+ Organization-level tenant isolation.
+ Pydantic/FastAPI input validation.
+ MIME type, file-size and filename validation.
+ Rate limiting for login, OTP, uploads, likes and password reset.
+ HTTPS for application traffic.
+ No sensitive citizen data in public feed.
+ Audit logs for important administrative and organization actions.
+15. Database Query Requirements
+ Citizen complaints by user_id with created_at sorting.
+ Organization queue by organization_id.
+ Department queue by department_id.
+ Public community feed with pagination.
+ Nearby complaints using the 2dsphere index.
+ Complaint timeline by complaint_id ordered by created_at.
+ Unread notifications by user_id and is_read.
+ High-priority complaints ordered by priority_score.
+16. Data Flow
+Complaint creation: users → categories → organizations/departments → complaints → complaint_images →
+complaint_updates → notifications → audit_logs.
+Community engagement: users → complaints → complaint_likes → complaint priority.
+Organization processing: complaints → users/departments → complaint_updates → complaint_images → notifications
+→ audit_logs.
+Push notifications: users → device_tokens → notifications.
+17. Backup, Reliability and Performance
+ Automated MongoDB backup and recovery procedures.
+ Pagination for large lists.
+ Indexes for common queries.
+ Aggregation pipelines for dashboard analytics.
+ Asynchronous FastAPI operations where appropriate.
+ Asynchronous processing for heavy image and notification work.
+ Retries for transient storage and notification failures.
+ Meaningful database/API error handling.
+ Target normal API response time below 500 ms where practical.
+ Target normal feed loading below 2 seconds under normal network conditions.
+These performance targets align with the original SRS. ■filecite■turn0file0■L864-L879■
+
+
+=== [Page 13] ===
+
+Voice2Gov — Database Design SRS v1.0
+Page 13
+18. Database Acceptance Criteria
+ All 12 required MongoDB collections are created.
+ Each collection contains the defined fields and types.
+ ObjectId references are used consistently.
+ Complaints support user, organization, department, category, location, status, priority and assignment.
+ Complaint images use metadata and secure storage references.
+ Duplicate likes are prevented.
+ Status transitions are validated.
+ GeoJSON locations support a 2dsphere index.
+ Complaint progress history is preserved.
+ Notifications and device tokens support notification delivery.
+ Administrative actions are auditable.
+ Organization tenant isolation is enforced.
+ Required indexes are created and tested.
+ Citizen, organization and admin portal queries are supported.
+ Backup and recovery procedures are defined before production deployment.
+Source Basis
+This database-specific SRS is based on the supplied Voice2Gov Software Requirements Specification v1.0, especially
+its technology stack, architecture, complaint workflow, authentication/RBAC, MongoDB design, indexing, security, and
+performance requirements. ■filecite■turn0file0■L232-L253■ ■filecite■turn0file0■L767-L835■

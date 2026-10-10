@@ -78,15 +78,15 @@ def create_test_app(service: FakeUserService) -> FastAPI:
 def service() -> FakeUserService:
     svc = FakeUserService()
     # ORG_A users
-    svc.seed("citizenA000000000000000000", UserRole.CITIZEN)
-    svc.seed("staffA00000000000000000000", UserRole.ORGANIZATION_STAFF, organization_id="orgA0000000000000000000000")
-    svc.seed("orgAdminA00000000000000000", UserRole.ORGANIZATION_ADMIN, organization_id="orgA0000000000000000000000")
+    svc.seed("507f1f77bcf86cd799439021", UserRole.CITIZEN)
+    svc.seed("507f1f77bcf86cd799439022", UserRole.ORGANIZATION_STAFF, organization_id="507f1f77bcf86cd799439012")
+    svc.seed("507f1f77bcf86cd799439023", UserRole.ORGANIZATION_ADMIN, organization_id="507f1f77bcf86cd799439012")
     # ORG_B users
-    svc.seed("citizenB000000000000000000", UserRole.CITIZEN)
-    svc.seed("staffB00000000000000000000", UserRole.ORGANIZATION_STAFF, organization_id="orgB0000000000000000000000")
-    svc.seed("orgAdminB00000000000000000", UserRole.ORGANIZATION_ADMIN, organization_id="orgB0000000000000000000000")
+    svc.seed("507f1f77bcf86cd799439028", UserRole.CITIZEN)
+    svc.seed("507f1f77bcf86cd799439025", UserRole.ORGANIZATION_STAFF, organization_id="507f1f77bcf86cd799439013")
+    svc.seed("507f1f77bcf86cd799439026", UserRole.ORGANIZATION_ADMIN, organization_id="507f1f77bcf86cd799439013")
     # Admin
-    svc.seed("admin000000000000000000000", UserRole.ADMIN)
+    svc.seed("507f1f77bcf86cd799439024", UserRole.ADMIN)
     return svc
 
 
@@ -105,6 +105,7 @@ async def client(app: FastAPI):
 def make_token(user_id: str, role: UserRole) -> str:
     """Create a valid access token for testing."""
     from app.core.security import create_access_token
+    # Ensure user_id is a valid 24-char hex ObjectId
     if len(user_id) < 24:
         user_id = user_id.ljust(24, "0")[:24]
     return create_access_token(user_id=user_id, role=role.value)
@@ -114,25 +115,25 @@ class TestGetCurrentOrganization:
     """Test the get_current_organization dependency."""
 
     async def test_org_staff_returns_org_id(self, client: AsyncClient) -> None:
-        token = make_token("staffA00000000000000000000", UserRole.ORGANIZATION_STAFF)
+        token = make_token("507f1f77bcf86cd799439022", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/current-org", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
-        assert response.json()["organization_id"] == "orgA0000000000000000000000"
+        assert response.json()["organization_id"] == "507f1f77bcf86cd799439012"
 
     async def test_org_admin_returns_org_id(self, client: AsyncClient) -> None:
-        token = make_token("orgAdminA00000000000000000", UserRole.ORGANIZATION_ADMIN)
+        token = make_token("507f1f77bcf86cd799439023", UserRole.ORGANIZATION_ADMIN)
         response = await client.get("/test/current-org", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
-        assert response.json()["organization_id"] == "orgA0000000000000000000000"
+        assert response.json()["organization_id"] == "507f1f77bcf86cd799439012"
 
     async def test_citizen_returns_none(self, client: AsyncClient) -> None:
-        token = make_token("citizenA000000000000000000", UserRole.CITIZEN)
+        token = make_token("507f1f77bcf86cd799439021", UserRole.CITIZEN)
         response = await client.get("/test/current-org", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert response.json()["organization_id"] is None
 
     async def test_admin_returns_none(self, client: AsyncClient) -> None:
-        token = make_token("admin000000000000000000000", UserRole.ADMIN)
+        token = make_token("507f1f77bcf86cd799439024", UserRole.ADMIN)
         response = await client.get("/test/current-org", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert response.json()["organization_id"] is None
@@ -146,26 +147,26 @@ class TestRequireOrganizationContext:
     """Test the require_organization_context dependency."""
 
     async def test_org_staff_returns_org_id(self, client: AsyncClient) -> None:
-        token = make_token("staffA00000000000000000000", UserRole.ORGANIZATION_STAFF)
+        token = make_token("507f1f77bcf86cd799439022", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/org-context", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
-        assert response.json()["organization_id"] == "orgA0000000000000000000000"
+        assert response.json()["organization_id"] == "507f1f77bcf86cd799439012"
 
     async def test_org_admin_returns_org_id(self, client: AsyncClient) -> None:
-        token = make_token("orgAdminA00000000000000000", UserRole.ORGANIZATION_ADMIN)
+        token = make_token("507f1f77bcf86cd799439023", UserRole.ORGANIZATION_ADMIN)
         response = await client.get("/test/org-context", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
-        assert response.json()["organization_id"] == "orgA0000000000000000000000"
+        assert response.json()["organization_id"] == "507f1f77bcf86cd799439012"
 
     async def test_citizen_returns_403(self, client: AsyncClient) -> None:
-        token = make_token("citizenA000000000000000000", UserRole.CITIZEN)
+        token = make_token("507f1f77bcf86cd799439021", UserRole.CITIZEN)
         response = await client.get("/test/org-context", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
         assert response.json()["error_code"] == "FORBIDDEN"
 
     async def test_admin_returns_403(self, client: AsyncClient) -> None:
         """Admin should get 403 because they have global access, not org-scoped."""
-        token = make_token("admin000000000000000000000", UserRole.ADMIN)
+        token = make_token("507f1f77bcf86cd799439024", UserRole.ADMIN)
         response = await client.get("/test/org-context", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
         assert response.json()["error_code"] == "FORBIDDEN"
@@ -173,8 +174,8 @@ class TestRequireOrganizationContext:
     async def test_staff_without_org_returns_403(self, client: AsyncClient, service: FakeUserService) -> None:
         # Seed staff without organization_id
         svc = service
-        svc.seed("staffNoOrg000000000000000", UserRole.ORGANIZATION_STAFF, organization_id=None)
-        token = make_token("staffNoOrg000000000000000", UserRole.ORGANIZATION_STAFF)
+        svc.seed("507f1f77bcf86cd799439036", UserRole.ORGANIZATION_STAFF, organization_id=None)
+        token = make_token("507f1f77bcf86cd799439036", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/org-context", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
 
@@ -183,44 +184,44 @@ class TestRequireSameOrganization:
     """Test the require_same_organization dependency."""
 
     async def test_same_org_allowed(self, client: AsyncClient) -> None:
-        token = make_token("staffA00000000000000000000", UserRole.ORGANIZATION_STAFF)
+        token = make_token("507f1f77bcf86cd799439022", UserRole.ORGANIZATION_STAFF)
         response = await client.get(
-            "/test/same-org/orgA0000000000000000000000",
+            "/test/same-org/507f1f77bcf86cd799439012",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
 
     async def test_different_org_denied(self, client: AsyncClient) -> None:
-        token = make_token("staffA00000000000000000000", UserRole.ORGANIZATION_STAFF)
+        token = make_token("507f1f77bcf86cd799439022", UserRole.ORGANIZATION_STAFF)
         response = await client.get(
-            "/test/same-org/orgB0000000000000000000000",
+            "/test/same-org/507f1f77bcf86cd799439013",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 403
         assert response.json()["error_code"] == "FORBIDDEN"
 
     async def test_admin_bypasses_check(self, client: AsyncClient) -> None:
-        token = make_token("admin000000000000000000000", UserRole.ADMIN)
+        token = make_token("507f1f77bcf86cd799439024", UserRole.ADMIN)
         response = await client.get(
-            "/test/same-org/orgB0000000000000000000000",
+            "/test/same-org/507f1f77bcf86cd799439013",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 200
 
     async def test_citizen_denied(self, client: AsyncClient) -> None:
-        token = make_token("citizenA000000000000000000", UserRole.CITIZEN)
+        token = make_token("507f1f77bcf86cd799439021", UserRole.CITIZEN)
         response = await client.get(
-            "/test/same-org/orgA0000000000000000000000",
+            "/test/same-org/507f1f77bcf86cd799439012",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 403
 
     async def test_staff_no_org_denied(self, client: AsyncClient, service: FakeUserService) -> None:
         svc = service
-        svc.seed("staffNoOrg000000000000000", UserRole.ORGANIZATION_STAFF, organization_id=None)
-        token = make_token("staffNoOrg000000000000000", UserRole.ORGANIZATION_STAFF)
+        svc.seed("507f1f77bcf86cd799439037", UserRole.ORGANIZATION_STAFF, organization_id=None)
+        token = make_token("507f1f77bcf86cd799439037", UserRole.ORGANIZATION_STAFF)
         response = await client.get(
-            "/test/same-org/orgA0000000000000000000000",
+            "/test/same-org/507f1f77bcf86cd799439012",
             headers={"Authorization": f"Bearer {token}"}
         )
         assert response.status_code == 403

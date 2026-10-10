@@ -44,3 +44,17 @@ build/
 # Environment
 .env.local
 .env.*.local
+.env
+backend/.env
+
+# Temporary probe scripts and sample dumps
+backend/_db_probe.py
+backend/db-voice2gov-sample.json
+backend/*.out
+
+# Token optimizer and temporary wiki metrics
+.token-optimizer/
+
+# Local media uploads
+backend/app/storage/uploads/
+uploads/

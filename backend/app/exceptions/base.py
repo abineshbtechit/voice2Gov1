@@ -16,6 +16,16 @@ class AppException(Exception):
         super().__init__(message)
 
 
+class BadRequestException(AppException):
+    def __init__(
+        self,
+        message: str = "Bad request",
+        error_code: str = "BAD_REQUEST",
+        details: dict[str, Any] | None = None,
+    ):
+        super().__init__(message, error_code, 400, details)
+
+
 class ValidationException(AppException):
     def __init__(
         self,
@@ -94,6 +104,61 @@ class FileUploadException(AppException):
         error_code: str = "FILE_UPLOAD_ERROR",
     ):
         super().__init__(message, error_code, 400)
+
+
+class FileValidationException(AppException):
+    """Base for file-upload validation failures (HTTP 400 per the API contract)."""
+
+    def __init__(
+        self,
+        message: str = "File validation failed",
+        error_code: str = "INVALID_FILE_TYPE",
+    ):
+        super().__init__(message, error_code, 400)
+
+
+class InvalidFileTypeException(FileValidationException):
+    """Declared/actual MIME type is not allowed for the image type."""
+
+    def __init__(
+        self,
+        message: str = "File type is not allowed",
+        error_code: str = "INVALID_FILE_TYPE",
+    ):
+        super().__init__(message, error_code)
+
+
+class FileTooLargeException(FileValidationException):
+    """Uploaded file exceeds the configured size limit for its image type."""
+
+    def __init__(
+        self,
+        message: str = "File exceeds the maximum allowed size",
+        error_code: str = "FILE_TOO_LARGE",
+    ):
+        super().__init__(message, error_code)
+
+
+class InvalidFilenameException(FileValidationException):
+    """Filename is unsafe (path traversal, absolute path, control characters)."""
+
+    def __init__(
+        self,
+        message: str = "Filename is not allowed",
+        error_code: str = "INVALID_FILENAME",
+    ):
+        super().__init__(message, error_code)
+
+
+class StorageException(AppException):
+    """Storage backend failure (upload/download/delete)."""
+
+    def __init__(
+        self,
+        message: str = "Storage operation failed",
+        error_code: str = "STORAGE_ERROR",
+    ):
+        super().__init__(message, error_code, 500)
 
 
 class ServiceNotReadyException(AppException):

@@ -136,6 +136,8 @@ Development: http://localhost:8000/api/v1/
 | PUT | `/complaints/{id}` | Update complaint (citizen, before assignment) | Bearer (citizen) |
 | DELETE | `/complaints/{id}` | Delete complaint (citizen, only SUBMITTED) | Bearer (citizen) |
 | POST | `/complaints/{id}/images` | Upload complaint images | Bearer |
+| GET | `/complaints/{id}/images` | List complaint images | Bearer |
+| DELETE | `/complaints/{id}/images/{image_id}` | Soft-delete complaint image (uploader only) | Bearer |
 | GET | `/complaints/{id}/priority` | Get priority breakdown | Bearer |
 | POST | `/complaints/{id}/updates` | Add update (org staff) | Bearer (org) |
 | GET | `/complaints/{id}/updates` | Get complaint updates | Bearer |
@@ -296,6 +298,68 @@ Development: http://localhost:8000/api/v1/
 ```json
 {
   "success": true,
+  "message": "User profile retrieved",
+  "data": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "citizen@example.com",
+    "phone": "+919876543210",
+    "full_name": "John Doe",
+    "role": "citizen",
+    "status": "active",
+    "is_verified": true
+  }
+}
+```
+
+#### POST /auth/forgot-password
+**Request**:
+```json
+{
+  "identifier": "citizen@example.com"
+}
+```
+
+**Response** (200):
+```json
+{
+  "message": "If an account exists with the provided information, a verification code has been sent.",
+  "cooldown_seconds": 60
+}
+```
+
+#### POST /auth/verify-otp
+**Request**:
+```json
+{
+  "identifier": "citizen@example.com",
+  "otp": "123456"
+}
+```
+
+**Response** (200):
+```json
+{
+  "reset_token": "AbC123XyZ...",
+  "expires_in": 900,
+  "message": "Verification successful. Use the reset token to complete password update."
+}
+```
+
+#### POST /auth/reset-password
+**Request**:
+```json
+{
+  "reset_token": "AbC123XyZ...",
+  "new_password": "NewSecurePassword123!"
+}
+```
+
+**Response** (200):
+```json
+{
+  "message": "Password has been reset successfully. You may now log in."
+}
+```
   "message": "Profile retrieved",
   "data": {
     "id": "507f1f77bcf86cd799439011",
@@ -493,9 +557,44 @@ Development: http://localhost:8000/api/v1/
         "image_type": "evidence",
         "url": "https://storage.example.com/...",
         "file_size": 2048576,
-        "mime_type": "image/jpeg"
+        "mime_type": "image/jpeg",
+        "created_at": "2024-01-16T14:30:00Z"
       }
     ]
+  }
+}
+```
+
+#### GET /complaints/{id}/images
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "Images retrieved",
+  "data": {
+    "images": [
+      {
+        "id": "507f1f77bcf86cd799439016",
+        "image_type": "evidence",
+        "url": "https://storage.example.com/...",
+        "file_size": 2048576,
+        "mime_type": "image/jpeg",
+        "created_at": "2024-01-16T14:30:00Z"
+      }
+    ]
+  }
+}
+```
+
+#### DELETE /complaints/{id}/images/{image_id}
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "Image deleted",
+  "data": {
+    "id": "507f1f77bcf86cd799439016",
+    "is_deleted": true
   }
 }
 ```
@@ -695,6 +794,32 @@ Development: http://localhost:8000/api/v1/
     },
     "avg_resolution_hours": 48.5,
     "sla_compliance_rate": 0.87
+  }
+}
+```
+
+---
+
+### Location
+
+#### GET /location/reverse
+**Query Parameters**:
+- `lat`: float, between -90.0 and 90.0
+- `lng`: float, between -180.0 and 180.0
+
+**Response** (200):
+```json
+{
+  "success": true,
+  "message": "Address resolved successfully",
+  "data": {
+    "formatted_address": "Location near 13.0827, 80.2707, Ward 12, Civic Zone",
+    "locality": "Civic Center",
+    "administrative_area": "State Division",
+    "postal_code": "600001",
+    "country": "India",
+    "latitude": 13.0827,
+    "longitude": 80.2707
   }
 }
 ```

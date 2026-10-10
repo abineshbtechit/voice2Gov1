@@ -1,8 +1,20 @@
 from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import get_current_user
-from app.dependencies.services import get_refresh_token_service, get_user_service
+from app.dependencies.services import (
+    get_password_recovery_service,
+    get_refresh_token_service,
+    get_user_service,
+)
 from app.middleware.rate_limit import rate_limit_auth
+from app.schemas.password_recovery import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordRequest,
+    ResetPasswordResponse,
+    VerifyOTPRequest,
+    VerifyOTPResponse,
+)
 from app.schemas.token import (
     LogoutRequest,
     LogoutResponse,
@@ -16,6 +28,7 @@ from app.schemas.user import (
     UserRegisterResponse,
     UserResponse,
 )
+from app.services.password_recovery_service import PasswordRecoveryService
 from app.services.token_service import RefreshTokenService
 from app.services.user_service import UserService
 
@@ -114,3 +127,58 @@ async def logout(
     """Revoke the refresh-token family for the presented refresh token."""
     await service.revoke(request.refresh_token)
     return LogoutResponse(message="Logged out")
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    summary="Start password recovery",
+    description=(
+        "Initiate password recovery flow by sending a 6-digit OTP code to the "
+        "registered email or phone. Returns a generic success message to prevent user enumeration."
+    ),
+    dependencies=[Depends(rate_limit_auth)],
+)
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    service: PasswordRecoveryService = Depends(get_password_recovery_service),
+) -> ForgotPasswordResponse:
+    """Request a password reset OTP code."""
+    return await service.initiate_password_recovery(request)
+
+
+@router.post(
+    "/verify-otp",
+    response_model=VerifyOTPResponse,
+    summary="Verify OTP",
+    description=(
+        "Verify a submitted 6-digit OTP. On success, issues a single-use "
+        "short-lived reset token (15-minute TTL) required to complete password reset."
+    ),
+    dependencies=[Depends(rate_limit_auth)],
+)
+async def verify_otp(
+    request: VerifyOTPRequest,
+    service: PasswordRecoveryService = Depends(get_password_recovery_service),
+) -> VerifyOTPResponse:
+    """Verify password recovery OTP code."""
+    return await service.verify_otp(request)
+
+
+@router.post(
+    "/reset-password",
+    response_model=ResetPasswordResponse,
+    summary="Reset password",
+    description=(
+        "Reset user password using the single-use reset token obtained from OTP verification. "
+        "Enforces full password complexity policy."
+    ),
+    dependencies=[Depends(rate_limit_auth)],
+)
+async def reset_password(
+    request: ResetPasswordRequest,
+    service: PasswordRecoveryService = Depends(get_password_recovery_service),
+) -> ResetPasswordResponse:
+    """Reset user password with valid reset token."""
+    return await service.reset_password(request)
+

@@ -22,7 +22,7 @@ This matrix maps SRS requirements to architecture decisions, planned implementat
 | AUTH-03 | JWT access + refresh tokens | RS256, 15min/30day, rotation | `app/security/jwt.py`, `app/security/token_blacklist.py` | `tests/unit/test_jwt.py`, `tests/security/test_token_security.py` |
 | AUTH-04 | Password hashing | bcrypt cost 12 | `app/security/password.py` | `tests/unit/test_password.py` |
 | AUTH-05 | Account lockout after failed attempts | 5 attempts, 15min lockout | `app/services/auth_service.py:track_failed_login()` | `tests/unit/test_auth_service.py::test_lockout` |
-| AUTH-06 | Password reset via OTP | 6-digit OTP, 10min TTL | `app/services/auth_service.py:forgot_password/reset_password` | `tests/integration/test_auth_api.py::test_password_reset` |
+| AUTH-06 | Password reset via OTP | 6-digit OTP, 10min TTL, single-use token | `app/services/password_recovery_service.py`, `app/api/v1/auth.py` | `tests/api/test_recovery_and_location_api.py`, `tests/unit/test_password_recovery_service.py` |
 | AUTH-07 | Role-based access control | 4 roles, org scoping | `app/security/rbac.py`, `app/security/dependencies.py` | `tests/security/test_rbac.py` |
 | AUTH-08 | Organization tenant isolation | Repository-level org filtering | `app/repositories/*.py` (base query scoping) | `tests/security/test_org_isolation.py` |
 | AUTH-09 | Resource ownership checks | Service-layer validation | `app/services/complaint_service.py` | `tests/unit/test_complaint_service.py::test_ownership` |
@@ -39,14 +39,14 @@ This matrix maps SRS requirements to architecture decisions, planned implementat
 | CMP-03 | Get my complaints | GET /complaints/my | `app/api/v1/complaints.py:get_my_complaints()` | `tests/integration/test_complaint_api.py::test_my` |
 | CMP-04 | Update complaint (citizen, SUBMITTED only) | PUT /complaints/{id} | `app/services/complaint_service.py:update_by_citizen()` | `tests/unit/test_complaint_service.py::test_update_*` |
 | CMP-05 | Delete complaint (citizen, SUBMITTED only) | DELETE /complaints/{id} | `app/services/complaint_service.py:delete_by_citizen()` | `tests/unit/test_complaint_service.py::test_delete_*` |
-| CMP-06 | Upload complaint images | POST /complaints/{id}/images | `app/services/image_service.py:upload_complaint_image()` | `tests/integration/test_complaint_api.py::test_upload_images` |
+| CMP-06 | Upload complaint images | POST /complaints/{id}/images | `app/services/image_service.py:upload_images()` | `tests/api/test_complaint_images.py`, `tests/security/test_complaint_image_security.py` |
 | CMP-07 | Category-based routing (category → org → dept) | categories.default_department_id (org-scoped, required) | `app/services/routing_service.py:route_complaint()` | `tests/unit/test_routing_service.py` |
-| CMP-08 | Department assignment | PATCH /complaints/{id}/assign | `app/services/complaint_service.py:assign()` | `tests/integration/test_complaint_api.py::test_assign` |
-| CMP-09 | Status transitions | Explicit state machine | `app/services/complaint_service.py:change_status()`, `app/schemas/complaint.py:StateMachine` | `tests/unit/test_complaint_service.py::test_state_machine` |
-| CMP-10 | Complaint updates (progress) | POST/GET /complaints/{id}/updates | `app/services/complaint_service.py:add_update/get_updates()` | `tests/integration/test_complaint_api.py::test_updates` |
-| CMP-11 | Complete complaint | PATCH /complaints/{id}/complete | `app/services/complaint_service.py:complete()` | `tests/unit/test_complaint_service.py::test_complete` |
+| CMP-08 | Department assignment | PATCH /complaints/{id}/assign | `app/repositories/complaint_repository.py:assign_complaint()`, `app/services/complaint_service.py:assign()`, `app/api/v1/complaints.py:assign_complaint()` | `tests/unit/test_complaint_assignment.py`, `tests/api/test_complaint_assignment_api.py` |
+| CMP-09 | Status transitions | Explicit state machine | `app/services/complaint_state_machine.py`, `app/services/complaint_service.py:change_status()`, `app/api/v1/complaints.py:update_complaint_status()` | `tests/unit/test_complaint_state_machine.py`, `tests/api/test_complaint_status_api.py` |
+| CMP-10 | Complaint updates (progress) | POST/GET /complaints/{id}/updates | `app/repositories/complaint_update_repository.py`, `app/services/complaint_service.py:add_timeline_update()/get_timeline_updates()`, `app/api/v1/complaints.py:create_complaint_timeline_update()/list_complaint_timeline_updates()` | `tests/unit/test_complaint_timeline_updates.py`, `tests/api/test_complaint_updates_api.py` |
+| CMP-11 | Complete complaint | PATCH /complaints/{id}/complete | `app/repositories/complaint_repository.py:complete_complaint()`, `app/services/complaint_service.py:complete()`, `app/api/v1/complaints.py:complete_complaint()` | `tests/unit/test_complaint_complete.py`, `tests/api/test_complaint_operations_api.py` |
 | CMP-12 | Priority score calculation | Weighted formula: raw → normalize/cap → weight → sum | `app/services/priority_service.py:calculate_priority()` | `tests/unit/test_priority_service.py` |
-| CMP-13 | Priority breakdown endpoint | GET /complaints/{id}/priority | `app/api/v1/complaints.py:get_priority()` | `tests/integration/test_complaint_api.py::test_priority` |
+| CMP-13 | Priority breakdown endpoint | GET /complaints/{id}/priority | `app/services/complaint_service.py:get_priority()`, `app/api/v1/complaints.py:get_complaint_priority()` | `tests/api/test_complaint_operations_api.py` |
 | CMP-14 | Complaint fields per SRS | complaint_number, likes_count, visibility | `app/schemas/complaint.py` | `tests/unit/test_complaint_schema.py` |
 
 ---
@@ -115,7 +115,7 @@ This matrix maps SRS requirements to architecture decisions, planned implementat
 | LOC-01 | Complaint location as GeoJSON Point | {type: "Point", coordinates: [lng, lat]} | `app/schemas/complaint.py:GeoJSONPoint` | `tests/unit/test_geojson.py` |
 | LOC-02 | 2dsphere index on location | complaints.location 2dsphere | `app/db/indexes.py` | `tests/unit/test_indexes.py` |
 | LOC-03 | Nearby complaints feed | $nearSphere in feed query | `app/services/feed_service.py:get_nearby()` | `tests/integration/test_feed_api.py::test_nearby` |
-| LOC-04 | Reverse geocoding | GET /location/reverse | `app/api/v1/search.py:reverse_geocode()` | `tests/integration/test_search_api.py` |
+| LOC-04 | Reverse geocoding | GET /location/reverse | `app/api/v1/location.py`, `app/services/geocoding_service.py` | `tests/api/test_recovery_and_location_api.py` |
 | LOC-05 | Search complaints | GET /search | `app/api/v1/search.py`, `app/services/search_service.py` | `tests/integration/test_search_api.py` |
 
 ---

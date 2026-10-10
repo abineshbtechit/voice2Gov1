@@ -1,8 +1,9 @@
-"""Authentication dependency (Phase 1.2.2).
+"""Authentication dependency (Phase 1.2.2 / Phase 1.8 hardening).
 
 Resolves the current user from a ``Authorization: Bearer <access_token>``
-header. This phase answers only *"is this token valid, and which user does it
-represent?"* — no authorization/RBAC is performed here.
+header.  In addition to token signature/expiry validation this dependency now
+enforces real-time account-status checks so that a suspended, inactive or
+locked user cannot authenticate with a still-valid access token.
 """
 
 from fastapi import Depends
@@ -11,8 +12,16 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.security import decode_access_token
 from app.dependencies.services import get_user_service
 from app.exceptions.base import UnauthorizedException
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse, UserStatus
 from app.services.user_service import UserService
+
+# Statuses that must be rejected at authentication time even if the token
+# signature and expiry are otherwise valid.
+_BLOCKED_STATUSES: frozenset[str] = frozenset({
+    UserStatus.SUSPENDED.value,
+    UserStatus.INACTIVE.value,
+    UserStatus.LOCKED.value,
+})
 
 # auto_error=False so we control the failure response (consistent error
 # contract) instead of FastAPI's default 403 for missing credentials.
@@ -48,4 +57,30 @@ async def get_current_user(
             error_code="TOKEN_INVALID",
         )
 
+    # Phase 1.8 hardening: reject suspended/inactive/locked accounts even
+    # when the access token has not yet expired.  Generic 401 message so we
+    # do not reveal *why* the account was deactivated.
+    status_val = user.status.value if hasattr(user.status, "value") else str(user.status)
+    if status_val in _BLOCKED_STATUSES:
+        raise UnauthorizedException(
+            "Account is not active",
+            error_code="ACCOUNT_INACTIVE",
+        )
+
     return user
+
+
+async def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    service: UserService = Depends(get_user_service),
+) -> UserResponse | None:
+    """Resolve the authenticated user if credentials are provided, else None."""
+    if credentials is None or not credentials.credentials:
+        return None
+
+    try:
+        payload = decode_access_token(credentials.credentials)
+        return await service.get_user_by_id(payload.sub)
+    except Exception:
+        return None
+

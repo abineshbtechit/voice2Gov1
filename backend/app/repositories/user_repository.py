@@ -1,13 +1,11 @@
+import re
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from bson import ObjectId
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError
-
-if TYPE_CHECKING:
-    pass
 
 from app.exceptions.base import ConflictException
 
@@ -139,6 +137,38 @@ class UserRepository:
         cursor = self._collection.find(query).skip(skip).limit(limit)
         return await cursor.to_list(length=limit)
 
+    async def find_users_in_organization_and_department(
+        self,
+        organization_id: str,
+        department_id: str,
+        role: str | None = None,
+        limit: int = 100,
+        skip: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Find users in a department AND organization (tenant isolation boundary).
+
+        Matching on both fields means a department_id from another organization
+        can never be used to list that organization's staff.
+
+        Args:
+            organization_id: The organization to scope by.
+            department_id: The department to filter by.
+            role: Optional role filter.
+            limit: Maximum number of results.
+            skip: Number of results to skip.
+
+        Returns:
+            List of user documents in the department within the organization.
+        """
+        query: dict[str, Any] = {
+            "organization_id": organization_id,
+            "department_id": department_id,
+        }
+        if role:
+            query["role"] = role
+        cursor = self._collection.find(query).skip(skip).limit(limit)
+        return await cursor.to_list(length=limit)
+
     async def count_users_in_organization(self, organization_id: str, role: str | None = None) -> int:
         """Count users in an organization (tenant-scoped)."""
         query = {"organization_id": organization_id}
@@ -194,3 +224,55 @@ class UserRepository:
             {"email": email.lower(), "organization_id": organization_id},
             limit=1,
         ) > 0
+
+    async def find_users(
+        self,
+        role: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        skip: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Find users with filtering and search (Admin use)."""
+        query: dict[str, Any] = {}
+        if role:
+            query["role"] = role
+        if status:
+            query["status"] = status
+        if search:
+            # Escape regex metacharacters: the search is a literal substring
+            # match, so a user-supplied operator (e.g. ".*") can neither widen
+            # the match into a full collection scan nor alter the semantics.
+            escaped = re.escape(search.strip())
+            query["$or"] = [
+                {"email": {"$regex": escaped, "$options": "i"}},
+                {"full_name": {"$regex": escaped, "$options": "i"}},
+                {"phone": {"$regex": escaped}},
+            ]
+        cursor = self._collection.find(query).sort("created_at", -1).skip(skip).limit(limit)
+        return await cursor.to_list(length=limit)
+
+    async def count_users(
+        self,
+        role: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> int:
+        """Count users with filtering and search (Admin use)."""
+        query: dict[str, Any] = {}
+        if role:
+            query["role"] = role
+        if status:
+            query["status"] = status
+        if search:
+            escaped = re.escape(search.strip())
+            query["$or"] = [
+                {"email": {"$regex": escaped, "$options": "i"}},
+                {"full_name": {"$regex": escaped, "$options": "i"}},
+                {"phone": {"$regex": escaped}},
+            ]
+        return await self._collection.count_documents(query)
+
+    async def count_all(self) -> int:
+        """Count all users across system."""
+        return await self._collection.count_documents({})

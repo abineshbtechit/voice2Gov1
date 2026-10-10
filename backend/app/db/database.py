@@ -33,10 +33,9 @@ class DatabaseManager:
             self._database = self._client[settings.mongodb_database]
             # Ping to verify connection
             await self._database.command("ping")
-            logger.info(
-                f"Connected to MongoDB: {settings.mongodb_database} "
-                f"at {settings.mongodb_uri}"
-            )
+            # Phase 1.8 hardening: never log the MongoDB URI — it can contain
+            # credentials. Log only the database name.
+            logger.info("Connected to MongoDB: %s", settings.mongodb_database)
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
             await self.disconnect()
@@ -75,6 +74,11 @@ db_manager = DatabaseManager()
 
 async def get_database() -> "AsyncDatabase[Any]":
     return db_manager.database
+
+
+async def get_database_optional() -> "AsyncDatabase[Any] | None":
+    """Return the database if connected, or None if disconnected."""
+    return db_manager._database
 
 
 async def init_database() -> None:

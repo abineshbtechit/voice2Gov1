@@ -4,12 +4,14 @@ Tests the role-based access control dependency mechanism in isolation,
 using in-memory fakes (no database).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
+from bson import ObjectId
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from app.core.security import create_access_token
 from app.dependencies.rbac import require_admin, require_organization_admin, require_roles
 from app.schemas.base import ObjectIdStr
 from app.schemas.user import UserResponse, UserRole, UserStatus
@@ -21,13 +23,19 @@ class FakeUserService:
     def __init__(self) -> None:
         self.users: dict[str, UserResponse] = {}
 
-    def seed(self, user_id: str, role: UserRole) -> None:
-        # Use a valid ObjectId format (24 hex chars)
-        if len(user_id) != 24:
-            user_id = user_id.ljust(24, "0")[:24]
+    def seed(self, user_id: str, role: UserRole) -> str:
+        """Seed a user, converting user_id to a valid ObjectId if needed."""
+        try:
+            ObjectId(user_id)
+            valid_user_id = user_id
+        except Exception:
+            # Generate a deterministic ObjectId from the provided string
+            import hashlib
+            hash_bytes = hashlib.sha256(user_id.encode()).digest()[:12]
+            valid_user_id = hash_bytes.hex()
         now = datetime.now(UTC)
-        self.users[user_id] = UserResponse(
-            id=ObjectIdStr(user_id),
+        self.users[valid_user_id] = UserResponse(
+            id=ObjectIdStr(valid_user_id),
             email=f"{role.value}@example.com",
             phone="+15550000000",
             full_name=f"{role.value.title()} User",
@@ -37,6 +45,7 @@ class FakeUserService:
             created_at=now,
             updated_at=now,
         )
+        return valid_user_id
 
     async def get_user_by_id(self, user_id: str) -> UserResponse | None:
         return self.users.get(user_id)
@@ -75,11 +84,11 @@ def create_test_app(service: FakeUserService) -> FastAPI:
 @pytest.fixture
 def service() -> FakeUserService:
     svc = FakeUserService()
-    # Use 24-char hex IDs that match what make_token will use
-    svc.seed("citizen12300000000000000000", UserRole.CITIZEN)
-    svc.seed("staff123000000000000000000", UserRole.ORGANIZATION_STAFF)
-    svc.seed("orgadmin12300000000000000", UserRole.ORGANIZATION_ADMIN)
-    svc.seed("admin12300000000000000000", UserRole.ADMIN)
+    # Use simple strings that will be converted to valid ObjectIds
+    svc.seed("citizen", UserRole.CITIZEN)
+    svc.seed("staff", UserRole.ORGANIZATION_STAFF)
+    svc.seed("orgadmin", UserRole.ORGANIZATION_ADMIN)
+    svc.seed("admin", UserRole.ADMIN)
     return svc
 
 
@@ -97,37 +106,47 @@ async def client(app: FastAPI):
 
 def make_token(user_id: str, role: UserRole) -> str:
     """Create a valid access token for testing."""
+    from bson import ObjectId
+
     from app.core.security import create_access_token
-    # Pad user_id to 24 chars to match seeded users
-    if len(user_id) < 24:
-        user_id = user_id.ljust(24, "0")[:24]
-    return create_access_token(user_id=user_id, role=role.value)
+    # The FakeUserService seeds users with a deterministic hash of the input string.
+    # We need to use the same hash for the token's sub claim.
+    try:
+        ObjectId(user_id)
+        valid_user_id = user_id
+    except Exception:
+        import hashlib
+        hash_bytes = hashlib.sha256(user_id.encode()).digest()[:12]
+        valid_user_id = hash_bytes.hex()
+    return create_access_token(user_id=valid_user_id, role=role.value)
 
 
 class TestRequireAdmin:
     """Test the require_admin convenience dependency."""
 
     async def test_admin_allowed(self, client: AsyncClient) -> None:
-        token = make_token("admin123", UserRole.ADMIN)
+        token = make_token("admin", UserRole.ADMIN)
         response = await client.get("/test/admin-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert response.json()["role"] == "admin"
 
     async def test_organization_admin_denied(self, client: AsyncClient) -> None:
-        token = make_token("orgadmin123", UserRole.ORGANIZATION_ADMIN)
+        token = make_token("orgadmin", UserRole.ORGANIZATION_ADMIN)
         response = await client.get("/test/admin-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
         assert response.json()["error_code"] == "FORBIDDEN"
 
     async def test_organization_staff_denied(self, client: AsyncClient) -> None:
-        token = make_token("staff123", UserRole.ORGANIZATION_STAFF)
+        token = make_token("staff", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/admin-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
+        assert response.json()["error_code"] == "FORBIDDEN"
 
     async def test_citizen_denied(self, client: AsyncClient) -> None:
-        token = make_token("citizen123", UserRole.CITIZEN)
+        token = make_token("citizen", UserRole.CITIZEN)
         response = await client.get("/test/admin-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
+        assert response.json()["error_code"] == "FORBIDDEN"
 
     async def test_no_token_returns_401(self, client: AsyncClient) -> None:
         response = await client.get("/test/admin-only")
@@ -144,48 +163,50 @@ class TestRequireOrganizationAdmin:
     """Test the require_organization_admin convenience dependency (org_admin + admin)."""
 
     async def test_organization_admin_allowed(self, client: AsyncClient) -> None:
-        token = make_token("orgadmin123", UserRole.ORGANIZATION_ADMIN)
+        token = make_token("orgadmin", UserRole.ORGANIZATION_ADMIN)
         response = await client.get("/test/org-admin", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert response.json()["role"] == "organization_admin"
 
     async def test_admin_allowed(self, client: AsyncClient) -> None:
-        token = make_token("admin123", UserRole.ADMIN)
+        token = make_token("admin", UserRole.ADMIN)
         response = await client.get("/test/org-admin", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         assert response.json()["role"] == "admin"
 
     async def test_organization_staff_denied(self, client: AsyncClient) -> None:
-        token = make_token("staff123", UserRole.ORGANIZATION_STAFF)
+        token = make_token("staff", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/org-admin", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
+        assert response.json()["error_code"] == "FORBIDDEN"
 
     async def test_citizen_denied(self, client: AsyncClient) -> None:
-        token = make_token("citizen123", UserRole.CITIZEN)
+        token = make_token("citizen", UserRole.CITIZEN)
         response = await client.get("/test/org-admin", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
+        assert response.json()["error_code"] == "FORBIDDEN"
 
 
 class TestRequireRolesMulti:
     """Test require_roles with multiple allowed roles."""
 
     async def test_organization_admin_allowed(self, client: AsyncClient) -> None:
-        token = make_token("orgadmin123", UserRole.ORGANIZATION_ADMIN)
+        token = make_token("orgadmin", UserRole.ORGANIZATION_ADMIN)
         response = await client.get("/test/multi-role", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
 
     async def test_admin_allowed(self, client: AsyncClient) -> None:
-        token = make_token("admin123", UserRole.ADMIN)
+        token = make_token("admin", UserRole.ADMIN)
         response = await client.get("/test/multi-role", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
 
     async def test_organization_staff_denied(self, client: AsyncClient) -> None:
-        token = make_token("staff123", UserRole.ORGANIZATION_STAFF)
+        token = make_token("staff", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/multi-role", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
 
     async def test_citizen_denied(self, client: AsyncClient) -> None:
-        token = make_token("citizen123", UserRole.CITIZEN)
+        token = make_token("citizen", UserRole.CITIZEN)
         response = await client.get("/test/multi-role", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
 
@@ -194,22 +215,22 @@ class TestRequireRolesCitizenOnly:
     """Test require_roles with only citizen allowed."""
 
     async def test_citizen_allowed(self, client: AsyncClient) -> None:
-        token = make_token("citizen123", UserRole.CITIZEN)
+        token = make_token("citizen", UserRole.CITIZEN)
         response = await client.get("/test/citizen-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
 
     async def test_admin_denied(self, client: AsyncClient) -> None:
-        token = make_token("admin123", UserRole.ADMIN)
+        token = make_token("admin", UserRole.ADMIN)
         response = await client.get("/test/citizen-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
 
     async def test_org_admin_denied(self, client: AsyncClient) -> None:
-        token = make_token("orgadmin123", UserRole.ORGANIZATION_ADMIN)
+        token = make_token("orgadmin", UserRole.ORGANIZATION_ADMIN)
         response = await client.get("/test/citizen-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
 
     async def test_staff_denied(self, client: AsyncClient) -> None:
-        token = make_token("staff123", UserRole.ORGANIZATION_STAFF)
+        token = make_token("staff", UserRole.ORGANIZATION_STAFF)
         response = await client.get("/test/citizen-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
 
@@ -232,11 +253,9 @@ class Test401vs403Distinction:
 
     async def test_expired_token_is_401_not_403(self, client: AsyncClient) -> None:
         """Expired tokens must return 401, never 403."""
-        from datetime import timedelta
-
-        from app.core.security import create_access_token
+        # Use a valid ObjectId string for the expired token
         expired_token = create_access_token(
-            user_id="admin123",
+            user_id="507f1f77bcf86cd799439011",
             role=UserRole.ADMIN.value,
             expires_delta=timedelta(seconds=-1),
         )
@@ -246,7 +265,7 @@ class Test401vs403Distinction:
 
     async def test_authenticated_but_insufficient_role_is_403(self, client: AsyncClient) -> None:
         """Valid token but wrong role must return 403, not 401."""
-        token = make_token("citizen123", UserRole.CITIZEN)
+        token = make_token("citizen", UserRole.CITIZEN)
         response = await client.get("/test/admin-only", headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 403
         assert response.json()["error_code"] == "FORBIDDEN"
