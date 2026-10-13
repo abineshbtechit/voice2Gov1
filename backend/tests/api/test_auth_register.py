@@ -56,6 +56,9 @@ class FakeUserRepository:
     async def find_by_phone(self, phone: str) -> dict[str, object] | None:
         return next((d for d in self.users.values() if d["phone"] == phone), None)
 
+    async def find_by_full_name(self, full_name: str) -> dict[str, object] | None:
+        return next((d for d in self.users.values() if str(d.get("full_name", "")).lower() == full_name.lower()), None)
+
     async def update(self, user_id: str, update_data: dict[str, object]) -> bool:
         if user_id in self.users:
             self.users[user_id].update(update_data)

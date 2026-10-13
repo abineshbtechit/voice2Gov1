@@ -7,6 +7,8 @@ import { CloudBG } from '../../components/common/Backgrounds';
 import { BigCTA, TextField } from '../../components/common/UIComponents';
 import { Icons } from '../../components/common/Icons';
 
+import { normalizeLoginIdentifier, parseAuthBackendError } from '../../utils/validation';
+
 interface LoginScreenProps {
   onBack: () => void;
   onSuccess: () => void;
@@ -22,7 +24,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack, onSuccess }) =
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!identifier || !password) {
+    const trimmed = identifier.trim();
+    if (!trimmed || !password) {
       setError('Please provide your email/phone and password');
       return;
     }
@@ -30,16 +33,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack, onSuccess }) =
     setLoading(true);
 
     try {
+      const normalizedIdentifier = normalizeLoginIdentifier(trimmed);
+
       const res = await ApiClient.post('/auth/login', {
-        identifier,
+        identifier: normalizedIdentifier,
         password,
       });
 
-      if (res.success && res.data) {
-        await login(res.data.access_token, res.data.refresh_token, res.data.user);
+      const loginData = res.data || (res as any);
+      if (res.success && loginData?.access_token) {
+        await login(loginData.access_token, loginData.refresh_token, loginData.user);
         onSuccess();
       } else {
-        setError(res.message || 'Login failed. Please check your credentials.');
+        const parsed = parseAuthBackendError(res);
+        setError(parsed.message || 'Login failed. Please check your credentials.');
       }
     } catch (e: any) {
       setError(e?.message || 'Network error. Please try again.');
@@ -74,12 +81,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack, onSuccess }) =
           Sign in to your{'\n'}account.
         </Text>
         <Text style={[styles.sub, { color: theme.fgMuted }]}>
-          Enter your registered email or mobile number to track complaints.
+          Enter your registered email, mobile number, or name to sign in.
         </Text>
 
         <View style={styles.formFields}>
           <TextField
-            placeholder="Email or phone number"
+            placeholder="Email, phone, or name"
             value={identifier}
             onChangeText={setIdentifier}
             autoFocus

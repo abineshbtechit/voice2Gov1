@@ -71,30 +71,6 @@ async def create_complaint(
 
 
 @router.get(
-    "/{complaint_id}",
-    response_model=ComplaintDetailResponseWrapper,
-    summary="Get complaint details",
-    description="Retrieve a complaint by ID. Authorization based on user role and complaint visibility.",
-)
-async def get_complaint(
-    complaint_id: str,
-    current_user: UserResponse = Depends(get_current_user),
-    complaint_service: ComplaintService = Depends(get_complaint_service),
-) -> ComplaintDetailResponseWrapper:
-    """Get a complaint by ID.
-
-    - **Authentication**: Required (Bearer token)
-    - **Authorization**:
-        - Admin: can access any complaint
-        - Organization admin: complaints in their organization
-        - Organization staff: complaints in their department
-        - Citizen: own complaints only
-    - **Response**: 200 with complaint details, 404 if not found/accessible
-    """
-    return await complaint_service.get_complaint_by_id(complaint_id, current_user)
-
-
-@router.get(
     "/my",
     response_model=MyComplaintsResponse,
     summary="Get current user's complaints",
@@ -118,6 +94,30 @@ async def get_my_complaints(
     - **Response**: 200 with paginated complaints
     """
     return await complaint_service.get_my_complaints(current_user, status, page, page_size)
+
+
+@router.get(
+    "/{complaint_id}",
+    response_model=ComplaintDetailResponseWrapper,
+    summary="Get complaint details",
+    description="Retrieve a complaint by ID. Authorization based on user role and complaint visibility.",
+)
+async def get_complaint(
+    complaint_id: str,
+    current_user: UserResponse = Depends(get_current_user),
+    complaint_service: ComplaintService = Depends(get_complaint_service),
+) -> ComplaintDetailResponseWrapper:
+    """Get a complaint by ID.
+
+    - **Authentication**: Required (Bearer token)
+    - **Authorization**:
+        - Admin: can access any complaint
+        - Organization admin: complaints in their organization
+        - Organization staff: complaints in their department
+        - Citizen: own complaints only
+    - **Response**: 200 with complaint details, 404 if not found/accessible
+    """
+    return await complaint_service.get_complaint_by_id(complaint_id, current_user)
 
 
 @router.put(

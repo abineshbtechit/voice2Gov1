@@ -22,7 +22,7 @@ interface AuthContextProps {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (token: string, refreshToken: string, user: User) => Promise<void>;
+  login: (token: string, refreshToken: string, user?: User) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
@@ -65,11 +65,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (token: string, refreshToken: string, userData: User) => {
+  const login = async (token: string, refreshToken: string, userData?: User) => {
     await AsyncStorage.setItem(ACCESS_TOKEN_KEY, token);
     await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    await AsyncStorage.setItem(USER_INFO_KEY, JSON.stringify(userData));
-    setUser(userData);
+
+    let resolvedUser = userData;
+    if (!resolvedUser) {
+      try {
+        const profileRes = await ApiClient.get<User>('/auth/me');
+        if (profileRes.success && profileRes.data) {
+          resolvedUser = profileRes.data;
+        } else {
+          resolvedUser = {
+            id: 'citizen',
+            email: '',
+            full_name: 'Citizen',
+            role: 'citizen',
+          };
+        }
+      } catch {
+        resolvedUser = {
+          id: 'citizen',
+          email: '',
+          full_name: 'Citizen',
+          role: 'citizen',
+        };
+      }
+    }
+
+    await AsyncStorage.setItem(USER_INFO_KEY, JSON.stringify(resolvedUser));
+    setUser(resolvedUser);
   };
 
   const logout = async () => {

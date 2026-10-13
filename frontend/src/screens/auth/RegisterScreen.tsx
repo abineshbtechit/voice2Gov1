@@ -6,6 +6,13 @@ import { ApiClient } from '../../api/client';
 import { CloudBG } from '../../components/common/Backgrounds';
 import { BigCTA, TextField } from '../../components/common/UIComponents';
 import { Icons } from '../../components/common/Icons';
+import {
+  normalizePhoneNumber,
+  isValidE164Phone,
+  isValidEmail,
+  validatePasswordPolicy,
+  parseAuthBackendError,
+} from '../../utils/validation';
 
 interface RegisterScreenProps {
   onBack: () => void;
@@ -24,7 +31,6 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,69 +38,125 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
   const handleNext = async () => {
     setError(null);
 
+    // Step 1: Full name
     if (step === 1) {
-      if (!fullName.trim()) return setError('Please enter your full name');
+      const trimmedName = fullName.trim();
+      if (!trimmedName) {
+        return setError('Please enter your full name');
+      }
+      if (trimmedName.length < 2) {
+        return setError('Full name must be at least 2 characters');
+      }
       return setStep(2);
     }
 
+    // Step 2: Contact Info (Email & E.164 Phone)
     if (step === 2) {
-      if (!email.trim() || !phone.trim()) return setError('Please enter both email and phone number');
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail) {
+        return setError('Please enter your email address');
+      }
+      if (!isValidEmail(cleanEmail)) {
+        return setError('Please enter a valid email address (e.g. name@example.com)');
+      }
+
+      const normalizedPhone = normalizePhoneNumber(phone);
+      if (!normalizedPhone) {
+        return setError('Please enter your phone number');
+      }
+      if (!isValidE164Phone(normalizedPhone)) {
+        return setError('Please enter a valid phone number with country code (e.g. +919876543210)');
+      }
+
+      // Update state with normalized values
+      setEmail(cleanEmail);
+      setPhone(normalizedPhone);
       return setStep(3);
     }
 
+    // Step 3: Password & Account Registration
     if (step === 3) {
-      if (!password || password.length < 8) return setError('Password must be at least 8 characters');
+      const pwdPolicy = validatePasswordPolicy(password);
+      if (!pwdPolicy.isValid) {
+        return setError(pwdPolicy.errors[0]);
+      }
+
       setLoading(true);
+
+      const cleanName = fullName.trim();
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPhone = normalizePhoneNumber(phone);
 
       try {
         const res = await ApiClient.post('/auth/register', {
-          full_name: fullName,
-          email,
-          phone,
+          full_name: cleanName,
+          email: cleanEmail,
+          phone: cleanPhone,
           password,
         });
 
         if (res.success) {
-          // Advance to OTP verification
+          // Advance to completed step
           setStep(4);
         } else {
-          setError(res.message || 'Registration failed');
+          const parsed = parseAuthBackendError(res);
+          setError(parsed.message);
+          if (parsed.targetStep) {
+            setStep(parsed.targetStep);
+          }
         }
       } catch (e: any) {
-        setError(e?.message || 'Network error');
+        setError(e?.message || 'Network error. Please try again.');
       } finally {
         setLoading(false);
       }
       return;
     }
 
+    // Step 4: Finalize & Sign In
     if (step === 4) {
-      if (!otp || otp.length < 4) return setError('Please enter the verification code');
       setLoading(true);
-
       try {
-        const verifyRes = await ApiClient.post('/auth/verify-otp', {
-          identifier: email,
-          otp,
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanPhone = normalizePhoneNumber(phone);
+
+        const loginRes = await ApiClient.post('/auth/login', {
+          identifier: cleanEmail,
+          password,
         });
 
-        if (verifyRes.success) {
-          // Login automatically
-          const loginRes = await ApiClient.post('/auth/login', {
-            identifier: email,
-            password,
-          });
-          if (loginRes.success && loginRes.data) {
-            await login(loginRes.data.access_token, loginRes.data.refresh_token, loginRes.data.user);
-            onSuccess();
-          } else {
-            onSuccess();
+        const loginData = loginRes.data || (loginRes as any);
+        if (loginRes.success && loginData?.access_token) {
+          const token = loginData.access_token;
+          const refreshToken = loginData.refresh_token;
+
+          let user = loginData?.user;
+          if (!user) {
+            try {
+              const meRes = await ApiClient.request('/auth/me', {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (meRes.success && meRes.data) user = meRes.data;
+            } catch {}
           }
+
+          await login(
+            token,
+            refreshToken,
+            user || {
+              id: 'citizen',
+              email: cleanEmail,
+              full_name: fullName.trim(),
+              role: 'citizen',
+            }
+          );
+          onSuccess();
         } else {
-          setError(verifyRes.message || 'Invalid code');
+          // When account is pending admin verification, route to login gracefully
+          onBack();
         }
-      } catch (e: any) {
-        setError(e?.message || 'Verification error');
+      } catch {
+        onBack();
       } finally {
         setLoading(false);
       }
@@ -102,6 +164,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
   };
 
   const handleStepBack = () => {
+    setError(null);
     if (step > 1) {
       setStep(step - 1);
     } else {
@@ -182,18 +245,22 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
             </Text>
             <View style={{ marginTop: 28, gap: 12 }}>
               <TextField
-                placeholder="email@example.com"
+                placeholder="name@example.com"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
+                autoCapitalize="none"
                 autoFocus
               />
               <TextField
-                placeholder="+91 98765 43210"
+                placeholder="+919876543210"
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
               />
+              <Text style={[styles.helperText, { color: theme.fgMuted }]}>
+                Include country code (e.g. +91 for India, +1 for US)
+              </Text>
             </View>
           </>
         )}
@@ -208,12 +275,55 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
             </Text>
             <View style={{ marginTop: 28 }}>
               <TextField
-                placeholder="Password (min 8 chars)"
+                placeholder="e.g. SecurePass123!"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
                 autoFocus
               />
+              <View style={styles.pwdHints}>
+                <Text
+                  style={[
+                    styles.pwdHintItem,
+                    { color: password.length >= 8 ? '#2FBF71' : theme.fgMuted },
+                  ]}
+                >
+                  • At least 8 characters
+                </Text>
+                <Text
+                  style={[
+                    styles.pwdHintItem,
+                    {
+                      color:
+                        /[A-Z]/.test(password) && /[a-z]/.test(password)
+                          ? '#2FBF71'
+                          : theme.fgMuted,
+                    },
+                  ]}
+                >
+                  • Uppercase & lowercase
+                </Text>
+                <Text
+                  style={[
+                    styles.pwdHintItem,
+                    { color: /\d/.test(password) ? '#2FBF71' : theme.fgMuted },
+                  ]}
+                >
+                  • At least one number
+                </Text>
+                <Text
+                  style={[
+                    styles.pwdHintItem,
+                    {
+                      color: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)
+                        ? '#2FBF71'
+                        : theme.fgMuted,
+                    },
+                  ]}
+                >
+                  • Special character (!@#$)
+                </Text>
+              </View>
             </View>
           </>
         )}
@@ -221,19 +331,37 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
         {step === 4 && (
           <>
             <Text style={[styles.title, { color: theme.fg }]}>
-              Enter the code{'\n'}we sent.
+              Welcome to{'\n'}Voice2Gov.
             </Text>
             <Text style={[styles.sub, { color: theme.fgMuted }]}>
-              Check your email/messages for the 6-digit confirmation code.
+              Your account has been registered for {fullName || 'Citizen'}.
             </Text>
             <View style={{ marginTop: 28 }}>
-              <TextField
-                placeholder="123456"
-                value={otp}
-                onChangeText={setOtp}
-                keyboardType="number-pad"
-                autoFocus
-              />
+              <View
+                style={[
+                  styles.successCard,
+                  {
+                    backgroundColor: theme.glassBg,
+                    borderColor: theme.glassBorder,
+                  },
+                ]}
+              >
+                <View style={styles.successRow}>
+                  <Icons.check size={22} color="#2FBF71" />
+                  <Text style={[styles.successText, { color: theme.fg }]}>
+                    Registration submitted
+                  </Text>
+                </View>
+                <Text style={[styles.successDetail, { color: theme.fgMuted }]}>
+                  Email: {email}
+                </Text>
+                <Text style={[styles.successDetail, { color: theme.fgMuted }]}>
+                  Phone: {normalizePhoneNumber(phone)}
+                </Text>
+                <Text style={[styles.successNote, { color: theme.fgFaint }]}>
+                  Click continue below to enter your account.
+                </Text>
+              </View>
             </View>
           </>
         )}
@@ -248,9 +376,23 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
         <BigCTA
           onPress={handleNext}
           disabled={loading}
-          icon={loading ? <ActivityIndicator size="small" color={theme.ctaFg} /> : <Icons.arrowRight size={18} color={theme.ctaFg} />}
+          icon={
+            loading ? (
+              <ActivityIndicator size="small" color={theme.ctaFg} />
+            ) : (
+              <Icons.arrowRight size={18} color={theme.ctaFg} />
+            )
+          }
         >
-          {step === 4 ? (loading ? 'Verifying...' : 'Complete setup') : (loading ? 'Submitting...' : 'Continue')}
+          {step === 4
+            ? loading
+              ? 'Finalizing...'
+              : 'Continue to Sign in'
+            : step === 3
+            ? loading
+              ? 'Creating account...'
+              : 'Create account'
+            : 'Continue'}
         </BigCTA>
       </View>
     </View>
@@ -309,6 +451,44 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
     lineHeight: 22,
   },
+  helperText: {
+    fontSize: 12,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  pwdHints: {
+    marginTop: 14,
+    paddingHorizontal: 4,
+    gap: 4,
+  },
+  pwdHintItem: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  successCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 20,
+    gap: 8,
+  },
+  successRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  successText: {
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  successDetail: {
+    fontSize: 13,
+  },
+  successNote: {
+    fontSize: 12,
+    marginTop: 6,
+  },
   errorText: {
     fontSize: 13,
     marginTop: 12,
@@ -319,4 +499,3 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 });
-

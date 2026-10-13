@@ -89,6 +89,13 @@ class UserRepository:
         """Find a user by email or phone."""
         return await self._collection.find_one({"$or": [{"email": email.lower()}, {"phone": phone}]})
 
+    async def find_by_full_name(self, full_name: str) -> dict[str, Any] | None:
+        """Find a user by full_name (case-insensitive)."""
+        escaped_name = re.escape(full_name.strip())
+        return await self._collection.find_one({
+            "full_name": re.compile(f"^{escaped_name}$", re.IGNORECASE)
+        })
+
     async def find_users_in_organization(
         self,
         organization_id: str,

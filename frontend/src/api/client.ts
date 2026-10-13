@@ -62,8 +62,48 @@ export class ApiClient {
       }
     }
 
-    const data = await response.json();
-    return data;
+    let data: any;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (response.ok) {
+      if (typeof data === 'object' && data !== null) {
+        return {
+          success: data.success !== undefined ? Boolean(data.success) : true,
+          message: data.message || 'Success',
+          data: data.data !== undefined ? data.data : data,
+          ...data,
+        };
+      }
+      return {
+        success: true,
+        message: 'Success',
+        data: data as T,
+      };
+    } else {
+      if (typeof data === 'object' && data !== null) {
+        return {
+          success: false,
+          message:
+            data.message ||
+            (data.errors && data.errors[0]?.message) ||
+            `HTTP error ${response.status}`,
+          error_code: data.error_code,
+          errors: data.errors || [],
+          data: data.data || null,
+          details: data.details,
+          ...data,
+        };
+      }
+      return {
+        success: false,
+        message: `HTTP error ${response.status}`,
+        data: null as any,
+      };
+    }
   }
 
   static async refreshToken(): Promise<boolean> {
@@ -143,7 +183,27 @@ export class ApiClient {
       },
       body: formData,
     });
-    return await res.json();
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+
+    if (res.ok) {
+      return {
+        success: data?.success !== undefined ? Boolean(data.success) : true,
+        message: data?.message || 'Images uploaded successfully',
+        data: data?.data !== undefined ? data.data : data,
+        ...data,
+      };
+    }
+    return {
+      success: false,
+      message: data?.message || `Image upload failed (${res.status})`,
+      errors: data?.errors || [],
+      ...data,
+    };
   }
 }
 

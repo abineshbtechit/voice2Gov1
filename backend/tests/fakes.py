@@ -68,6 +68,9 @@ class FakeUserRepository:
     async def find_by_email_or_phone(self, email: str, phone: str) -> dict[str, Any] | None:
         return next((d for d in self.users.values() if d["email"] == email.lower() or d["phone"] == phone), None)
 
+    async def find_by_full_name(self, full_name: str) -> dict[str, Any] | None:
+        return next((d for d in self.users.values() if str(d.get("full_name", "")).lower() == full_name.lower()), None)
+
     async def find_users_in_organization(
         self,
         organization_id: str,

@@ -111,11 +111,13 @@ class UserService:
         identifier = request.identifier.strip()
         password = request.password
 
-        # Find user by email or phone (normalized)
+        # Find user by email or phone (normalized), with full_name fallback
         if "@" in identifier:
             user_doc = await self._repository.find_by_email(identifier.lower())
         else:
             user_doc = await self._repository.find_by_phone(identifier)
+            if not user_doc and hasattr(self._repository, "find_by_full_name"):
+                user_doc = await self._repository.find_by_full_name(identifier)
 
         # Check if user exists
         if not user_doc:
@@ -137,8 +139,8 @@ class UserService:
                 error_code="ACCOUNT_LOCKED",
             )
 
-        # Check account status
-        if user_doc.get("status") != UserStatus.ACTIVE.value:
+        # Check account status (reject inactive or suspended users)
+        if user_doc.get("status") in (UserStatus.INACTIVE.value, UserStatus.SUSPENDED.value):
             raise UnauthorizedException("Account is not active", error_code="ACCOUNT_INACTIVE")
 
         # Verify password
@@ -181,7 +183,8 @@ class UserService:
         update_data = {
             "failed_login_attempts": 0,
             "locked_until": None,
-            "status": UserStatus.ACTIVE.value if user_doc and user_doc.get("status") == UserStatus.LOCKED.value else (user_doc.get("status", UserStatus.ACTIVE.value) if user_doc else UserStatus.ACTIVE.value),
+            "status": UserStatus.ACTIVE.value,
+            "is_verified": True,
             "last_login_at": datetime.now(UTC),
             "updated_at": datetime.now(UTC),
         }
