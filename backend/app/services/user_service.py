@@ -149,6 +149,19 @@ class UserService:
             await self._handle_failed_login(user_doc)
             raise UnauthorizedException("Invalid credentials", error_code="INVALID_CREDENTIALS")
 
+        # Check pending verification status (revert auto-activation: citizen must verify via OTP)
+        if user_doc.get("status") == UserStatus.PENDING_VERIFICATION.value or not user_doc.get("is_verified", False):
+            raise UnauthorizedException(
+                "Account verification required. Please verify your account using the OTP sent to your email or WhatsApp.",
+                error_code="PENDING_VERIFICATION",
+                details={
+                    "identifier": identifier,
+                    "email": user_doc.get("email"),
+                    "phone": user_doc.get("phone"),
+                    "full_name": user_doc.get("full_name"),
+                },
+            )
+
         # Password verified - reset failed attempts and update last_login_at
         await self._reset_failed_login_attempts(user_doc["_id"])
 
@@ -178,13 +191,9 @@ class UserService:
 
     async def _reset_failed_login_attempts(self, user_id: str) -> None:
         """Reset failed login attempts on successful login."""
-        # First get the current user to check status
-        user_doc = await self._repository.find_by_id(user_id)
         update_data = {
             "failed_login_attempts": 0,
             "locked_until": None,
-            "status": UserStatus.ACTIVE.value,
-            "is_verified": True,
             "last_login_at": datetime.now(UTC),
             "updated_at": datetime.now(UTC),
         }

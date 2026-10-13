@@ -12,9 +12,19 @@ import { normalizeLoginIdentifier, parseAuthBackendError } from '../../utils/val
 interface LoginScreenProps {
   onBack: () => void;
   onSuccess: () => void;
+  onNavigateToVerification?: (data: {
+    identifier: string;
+    email?: string;
+    phone?: string;
+    fullName?: string;
+  }) => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack, onSuccess }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onBack,
+  onSuccess,
+  onNavigateToVerification,
+}) => {
   const { theme, isDark } = useAppTheme();
   const { login } = useAuth();
 
@@ -46,6 +56,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack, onSuccess }) =
         onSuccess();
       } else {
         const parsed = parseAuthBackendError(res);
+        if (
+          res.error_code === 'PENDING_VERIFICATION' ||
+          (res.message && res.message.toLowerCase().includes('verification'))
+        ) {
+          if (onNavigateToVerification) {
+            onNavigateToVerification({
+              identifier: normalizedIdentifier,
+              email: res.details?.email || (normalizedIdentifier.includes('@') ? normalizedIdentifier : undefined),
+              phone: res.details?.phone || (!normalizedIdentifier.includes('@') ? normalizedIdentifier : undefined),
+              fullName: res.details?.full_name,
+            });
+            return;
+          }
+        }
         setError(parsed.message || 'Login failed. Please check your credentials.');
       }
     } catch (e: any) {

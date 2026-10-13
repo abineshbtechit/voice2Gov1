@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useAppTheme } from '../../context/ThemeContext';
 import { Radius, Colors } from '../../theme/tokens';
+import { Icons } from './Icons';
 
 export interface GlassCardProps {
   children: React.ReactNode;
@@ -220,6 +221,7 @@ export interface TextFieldProps {
   autoCapitalize?: any;
   autoFocus?: boolean;
   icon?: React.ReactNode;
+  rightAction?: React.ReactNode;
   style?: ViewStyle;
 }
 
@@ -232,9 +234,11 @@ export const TextField: React.FC<TextFieldProps> = ({
   autoCapitalize = 'none',
   autoFocus,
   icon,
+  rightAction,
   style,
 }) => {
   const { theme, isDark } = useAppTheme();
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
   return (
     <View
@@ -264,7 +268,7 @@ export const TextField: React.FC<TextFieldProps> = ({
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={theme.fgFaint}
-        secureTextEntry={secureTextEntry}
+        secureTextEntry={secureTextEntry ? !isPasswordVisible : false}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         autoFocus={autoFocus}
@@ -275,8 +279,25 @@ export const TextField: React.FC<TextFieldProps> = ({
           letterSpacing: -0.2,
           color: theme.fg,
           padding: 0,
+          ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
         }}
       />
+      {secureTextEntry ? (
+        <TouchableOpacity
+          onPress={() => setIsPasswordVisible((prev) => !prev)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.7}
+          style={{ padding: 4, marginLeft: 8 }}
+        >
+          {isPasswordVisible ? (
+            <Icons.eyeOff size={20} color={theme.fgMuted} />
+          ) : (
+            <Icons.eye size={20} color={theme.fgMuted} />
+          )}
+        </TouchableOpacity>
+      ) : rightAction ? (
+        <View style={{ marginLeft: 8 }}>{rightAction}</View>
+      ) : null}
     </View>
   );
 };

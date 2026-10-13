@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.dependencies.auth import get_current_user
 from app.dependencies.services import (
+    get_account_verification_service,
     get_password_recovery_service,
     get_refresh_token_service,
     get_user_service,
@@ -28,6 +29,13 @@ from app.schemas.user import (
     UserRegisterResponse,
     UserResponse,
 )
+from app.schemas.account_verification import (
+    SendVerificationOTPRequest,
+    SendVerificationOTPResponse,
+    VerifyAccountOTPRequest,
+    VerifyAccountOTPResponse,
+)
+from app.services.account_verification_service import AccountVerificationService
 from app.services.password_recovery_service import PasswordRecoveryService
 from app.services.token_service import RefreshTokenService
 from app.services.user_service import UserService
@@ -181,4 +189,35 @@ async def reset_password(
 ) -> ResetPasswordResponse:
     """Reset user password with valid reset token."""
     return await service.reset_password(request)
+
+
+@router.post(
+    "/send-verification-otp",
+    response_model=SendVerificationOTPResponse,
+    summary="Send account verification OTP",
+    description="Generate and dispatch 6-digit verification code to email (via Google SMTP) or WhatsApp URL query.",
+    dependencies=[Depends(rate_limit_auth)],
+)
+async def send_verification_otp(
+    request: SendVerificationOTPRequest,
+    service: AccountVerificationService = Depends(get_account_verification_service),
+) -> SendVerificationOTPResponse:
+    """Send or resend 6-digit OTP via Email (Google SMTP) or WhatsApp."""
+    return await service.send_verification_otp(request)
+
+
+@router.post(
+    "/verify-account-otp",
+    response_model=VerifyAccountOTPResponse,
+    summary="Verify account OTP and activate citizen",
+    description="Verify 6-digit OTP, activate account from pending_verification to active, and issue auth token pair.",
+    dependencies=[Depends(rate_limit_auth)],
+)
+async def verify_account_otp(
+    request: VerifyAccountOTPRequest,
+    service: AccountVerificationService = Depends(get_account_verification_service),
+) -> VerifyAccountOTPResponse:
+    """Verify 6-digit registration OTP, activate account, and issue token pair."""
+    return await service.verify_account_otp(request)
+
 

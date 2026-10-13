@@ -10,6 +10,7 @@ import { OnboardingScreen } from './src/screens/foundation/OnboardingScreen';
 import { AuthWelcomeScreen } from './src/screens/auth/AuthWelcomeScreen';
 import { LoginScreen } from './src/screens/auth/LoginScreen';
 import { RegisterScreen } from './src/screens/auth/RegisterScreen';
+import { OTPVerificationScreen } from './src/screens/auth/OTPVerificationScreen';
 import { HomeScreen } from './src/screens/home/HomeScreen';
 import { VoiceComplaintScreen } from './src/screens/voice/VoiceComplaintScreen';
 import { AIProcessingScreen } from './src/screens/voice/AIProcessingScreen';
@@ -37,6 +38,7 @@ type AppScreen =
   | 'welcome'
   | 'login'
   | 'register'
+  | 'otp_verification'
   | 'home'
   | 'voice_record'
   | 'text_complaint'
@@ -64,12 +66,18 @@ function MainApp() {
   );
   const [submittedComplaint, setSubmittedComplaint] = useState<any>(null);
   const [selectedComplaintId, setSelectedComplaintId] = useState<string | null>(null);
+  const [verificationData, setVerificationData] = useState<{
+    identifier: string;
+    email?: string;
+    phone?: string;
+    fullName?: string;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('home');
 
   // Sync auth state
   useEffect(() => {
     if (!isAuthenticated) {
-      if (!['welcome', 'login', 'register', 'onboarding'].includes(currentScreen)) {
+      if (!['welcome', 'login', 'register', 'onboarding', 'otp_verification'].includes(currentScreen)) {
         setCurrentScreen('welcome');
       }
     }
@@ -82,7 +90,7 @@ function MainApp() {
     if (tab === 'complaints') setCurrentScreen('complaints');
     if (tab === 'voice') setCurrentScreen('voice_record');
     if (tab === 'notifications') setCurrentScreen('notifications');
-    if (tab === 'profile') setCurrentScreen('profile');
+    if (tab === 'feed') setCurrentScreen('feed');
   };
 
   return (
@@ -103,6 +111,10 @@ function MainApp() {
           <LoginScreen
             onBack={() => setCurrentScreen('welcome')}
             onSuccess={() => setCurrentScreen('home')}
+            onNavigateToVerification={(data) => {
+              setVerificationData(data);
+              setCurrentScreen('otp_verification');
+            }}
           />
         )}
 
@@ -110,6 +122,24 @@ function MainApp() {
           <RegisterScreen
             onBack={() => setCurrentScreen('welcome')}
             onSuccess={() => setCurrentScreen('home')}
+            onNavigateToVerification={(data) => {
+              setVerificationData(data);
+              setCurrentScreen('otp_verification');
+            }}
+          />
+        )}
+
+        {currentScreen === 'otp_verification' && (
+          <OTPVerificationScreen
+            identifier={verificationData?.identifier || ''}
+            email={verificationData?.email}
+            phone={verificationData?.phone}
+            fullName={verificationData?.fullName}
+            onBack={() => setCurrentScreen('welcome')}
+            onSuccess={() => {
+              setActiveTab('home');
+              setCurrentScreen('home');
+            }}
           />
         )}
 
@@ -132,6 +162,7 @@ function MainApp() {
               setSelectedComplaintId(id);
               setCurrentScreen('complaint_detail');
             }}
+            onOpenProfile={() => setCurrentScreen('profile')}
           />
         )}
 
@@ -203,7 +234,11 @@ function MainApp() {
         {currentScreen === 'complaint_detail' && selectedComplaintId && (
           <ComplaintDetailsScreen
             complaintId={selectedComplaintId}
-            onBack={() => setCurrentScreen('complaints')}
+            onBack={() => {
+              if (activeTab === 'feed') setCurrentScreen('feed');
+              else if (activeTab === 'home') setCurrentScreen('home');
+              else setCurrentScreen('complaints');
+            }}
           />
         )}
 
@@ -278,7 +313,7 @@ function MainApp() {
       </View>
 
       {/* Floating Bottom Nav shown on top-level tabs */}
-      {['home', 'complaints', 'notifications', 'profile'].includes(currentScreen) && (
+      {['home', 'complaints', 'notifications', 'feed'].includes(currentScreen) && (
         <BottomNav
           activeTab={activeTab}
           onTabPress={handleTabPress}

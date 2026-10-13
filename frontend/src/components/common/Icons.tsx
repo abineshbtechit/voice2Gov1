@@ -40,6 +40,37 @@ export const Icons = {
       <Path d="M4 21c1-4 4-6 8-6s7 2 8 6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
     </Svg>
   ),
+  users: ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="9" cy="7" r="4" stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  mail: ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="5" width="18" height="14" rx="2" stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M3 7l9 6 9-6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  whatsapp: ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M9.5 9.5c.2-.5.5-.5.8-.5h.6c.2 0 .4.1.5.3l.8 1.8c.1.3.1.5-.1.7l-.4.5c-.1.2-.2.3-.1.5.4.8 1 1.4 1.8 1.8.2.1.3 0 .5-.1l.5-.4c.2-.2.4-.2.7-.1l1.8.8c.2.1.3.3.3.5v.6c0 .3-.1.6-.5.8-.5.2-1.3.3-2.6-.3-1.6-.7-2.9-2-3.6-3.6-.6-1.3-.5-2.1-.3-2.6z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  ),
   search: ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="11" cy="11" r="7" stroke={color} strokeWidth={strokeWidth} />
@@ -169,6 +200,50 @@ export const Icons = {
   wifiOff: ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M3 3l18 18M9 17a4 4 0 0 1 6 0M5 13a10 10 0 0 1 4-2.5M19 13a10 10 0 0 0-3-2M2 8.5A15 15 0 0 1 8 5.5M22 8.5a15 15 0 0 0-6-3M12 21h.01" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  ),
+  refresh: ({ size = 22, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M23 4v6h-6M1 20v-6h6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  ),
+  eye: ({ size = 20, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle
+        cx="12"
+        cy="12"
+        r="3"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  ),
+  eyeOff: ({ size = 20, color = 'currentColor', strokeWidth = 1.7 }: IconProps) => (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M1 1l22 22"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </Svg>
   ),
 };

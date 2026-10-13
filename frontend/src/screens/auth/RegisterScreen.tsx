@@ -17,9 +17,19 @@ import {
 interface RegisterScreenProps {
   onBack: () => void;
   onSuccess: () => void;
+  onNavigateToVerification?: (data: {
+    identifier: string;
+    email?: string;
+    phone?: string;
+    fullName?: string;
+  }) => void;
 }
 
-export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSuccess }) => {
+export const RegisterScreen: React.FC<RegisterScreenProps> = ({
+  onBack,
+  onSuccess,
+  onNavigateToVerification,
+}) => {
   const { theme, isDark } = useAppTheme();
   const { login } = useAuth();
 
@@ -31,6 +41,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +92,14 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
         return setError(pwdPolicy.errors[0]);
       }
 
+      if (!confirmPassword) {
+        return setError('Please confirm your password');
+      }
+
+      if (password !== confirmPassword) {
+        return setError('Passwords do not match. Please re-enter.');
+      }
+
       setLoading(true);
 
       const cleanName = fullName.trim();
@@ -113,53 +132,21 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
       return;
     }
 
-    // Step 4: Finalize & Sign In
+    // Step 4: Finalize & Navigate to OTP Verification
     if (step === 4) {
-      setLoading(true);
-      try {
-        const cleanEmail = email.trim().toLowerCase();
-        const cleanPhone = normalizePhoneNumber(phone);
-
-        const loginRes = await ApiClient.post('/auth/login', {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPhone = normalizePhoneNumber(phone);
+      if (onNavigateToVerification) {
+        onNavigateToVerification({
           identifier: cleanEmail,
-          password,
+          email: cleanEmail,
+          phone: cleanPhone,
+          fullName: fullName.trim(),
         });
-
-        const loginData = loginRes.data || (loginRes as any);
-        if (loginRes.success && loginData?.access_token) {
-          const token = loginData.access_token;
-          const refreshToken = loginData.refresh_token;
-
-          let user = loginData?.user;
-          if (!user) {
-            try {
-              const meRes = await ApiClient.request('/auth/me', {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (meRes.success && meRes.data) user = meRes.data;
-            } catch {}
-          }
-
-          await login(
-            token,
-            refreshToken,
-            user || {
-              id: 'citizen',
-              email: cleanEmail,
-              full_name: fullName.trim(),
-              role: 'citizen',
-            }
-          );
-          onSuccess();
-        } else {
-          // When account is pending admin verification, route to login gracefully
-          onBack();
-        }
-      } catch {
-        onBack();
-      } finally {
-        setLoading(false);
+      } else {
+        onSuccess();
       }
+      return;
     }
   };
 
@@ -273,14 +260,44 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
             <Text style={[styles.sub, { color: theme.fgMuted }]}>
               Must be at least 8 characters to safeguard your civic account.
             </Text>
-            <View style={{ marginTop: 28 }}>
+            <View style={{ marginTop: 24 }}>
               <TextField
-                placeholder="e.g. SecurePass123!"
+                placeholder="Create password"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(val) => {
+                  setPassword(val);
+                  if (error) setError(null);
+                }}
                 secureTextEntry
                 autoFocus
               />
+              <View style={{ height: 12 }} />
+              <TextField
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChangeText={(val) => {
+                  setConfirmPassword(val);
+                  if (error) setError(null);
+                }}
+                secureTextEntry
+              />
+
+              {confirmPassword.length > 0 && (
+                <View style={{ marginTop: 8, paddingHorizontal: 4 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: password === confirmPassword ? '#2FBF71' : '#E5484D',
+                    }}
+                  >
+                    {password === confirmPassword
+                      ? '✓ Passwords match'
+                      : '• Passwords do not match'}
+                  </Text>
+                </View>
+              )}
+
               <View style={styles.pwdHints}>
                 <Text
                   style={[
@@ -385,9 +402,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onBack, onSucces
           }
         >
           {step === 4
-            ? loading
-              ? 'Finalizing...'
-              : 'Continue to Sign in'
+            ? 'Verify Account with OTP'
             : step === 3
             ? loading
               ? 'Creating account...'

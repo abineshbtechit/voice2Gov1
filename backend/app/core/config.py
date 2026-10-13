@@ -164,6 +164,15 @@ class Settings(BaseSettings):
         description="Active geocoding provider: 'mock' (dev/test) or 'external' (gis/tiles)",
     )
 
+    # Google SMTP Settings (Free Email Verification)
+    smtp_host: str = Field(default="smtp.gmail.com", description="SMTP server hostname")
+    smtp_port: int = Field(default=587, description="SMTP server port (587 TLS, 465 SSL)")
+    smtp_user: str = Field(default="", description="Google/Gmail username (e.g. yourname@gmail.com)")
+    smtp_password: str = Field(default="", description="Google 16-character App Password")
+    smtp_from_email: str = Field(default="", description="Sender email address")
+    smtp_from_name: str = Field(default="Voice2Gov Verification", description="Sender display name")
+    smtp_use_tls: bool = Field(default=True, description="Enable STARTTLS for SMTP")
+
     # Logging
     log_level: str = Field(default="INFO")
     log_format: str = Field(default="json")

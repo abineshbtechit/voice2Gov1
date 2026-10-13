@@ -20,8 +20,8 @@ export const AuthApi = {
   login: (payload: LoginPayload) =>
     ApiClient.post('/auth/login', payload),
 
-  logout: () =>
-    ApiClient.post('/auth/logout'),
+  logout: (refreshToken?: string) =>
+    ApiClient.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : undefined),
 
   refresh: (refreshToken: string) =>
     ApiClient.post('/auth/refresh', { refresh_token: refreshToken }),
@@ -40,5 +40,11 @@ export const AuthApi = {
 
   getMe: () =>
     ApiClient.get('/auth/me'),
+
+  sendVerificationOtp: (identifier: string, channel: 'email' | 'whatsapp' = 'email') =>
+    ApiClient.post('/auth/send-verification-otp', { identifier, channel }),
+
+  verifyAccountOtp: (identifier: string, otp: string) =>
+    ApiClient.post('/auth/verify-account-otp', { identifier, otp }),
 };
 

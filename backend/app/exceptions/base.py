@@ -60,8 +60,9 @@ class UnauthorizedException(AppException):
         self,
         message: str = "Unauthorized",
         error_code: str = "UNAUTHORIZED",
+        details: dict[str, Any] | None = None,
     ):
-        super().__init__(message, error_code, 401)
+        super().__init__(message, error_code, 401, details)
 
 
 class ForbiddenException(AppException):

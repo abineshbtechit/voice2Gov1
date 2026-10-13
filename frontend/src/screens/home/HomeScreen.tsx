@@ -21,6 +21,7 @@ interface HomeScreenProps {
   onViewComplaints: () => void;
   onOpenNotifications: () => void;
   onSelectComplaint: (id: string) => void;
+  onOpenProfile?: () => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -29,6 +30,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onViewComplaints,
   onOpenNotifications,
   onSelectComplaint,
+  onOpenProfile,
 }) => {
   const { theme, isDark } = useAppTheme();
   const { user } = useAuth();
@@ -104,7 +106,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.unreadDot} />
         </TouchableOpacity>
 
-        <View
+        <TouchableOpacity
+          onPress={onOpenProfile}
+          activeOpacity={0.8}
           style={[
             styles.avatarCircle,
             {
@@ -115,7 +119,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Text style={[styles.avatarText, { color: isDark ? '#FAFAFA' : '#101012' }]}>
             {initials}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       <ScrollView

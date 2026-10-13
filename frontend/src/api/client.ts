@@ -16,6 +16,7 @@ export interface ApiResponse<T = any> {
   data: T;
   error_code?: string;
   errors?: Array<{ field: string; message: string; code: string }>;
+  details?: any;
 }
 
 export class ApiClient {

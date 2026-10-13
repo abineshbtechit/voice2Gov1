@@ -136,7 +136,10 @@ export const CommunityFeedScreen: React.FC<CommunityFeedScreenProps> = ({
               radius={Radius.xl}
               style={{ marginBottom: 12 }}
             >
-              <TouchableOpacity onPress={() => onSelectComplaint(item.id)}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => onSelectComplaint(item.id)}
+              >
                 <View style={styles.feedCardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.deptText, { color: theme.fgMuted }]}>
@@ -167,43 +170,44 @@ export const CommunityFeedScreen: React.FC<CommunityFeedScreenProps> = ({
                     </Text>
                   </View>
                 )}
+              </TouchableOpacity>
 
-                <View style={styles.feedCardFooter}>
-                  <TouchableOpacity
-                    onPress={() => handleToggleLike(item)}
+              <View style={styles.feedCardFooter}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleToggleLike(item)}
+                  style={[
+                    styles.likeBtn,
+                    {
+                      backgroundColor: item.user_liked
+                        ? 'rgba(229,72,77,0.15)'
+                        : isDark
+                        ? 'rgba(255,255,255,0.06)'
+                        : 'rgba(0,0,0,0.04)',
+                    },
+                  ]}
+                >
+                  <Icons.heart
+                    size={18}
+                    color={item.user_liked ? '#E5484D' : theme.fg}
+                    filled={item.user_liked}
+                  />
+                  <Text
                     style={[
-                      styles.likeBtn,
+                      styles.likeCount,
                       {
-                        backgroundColor: item.user_liked
-                          ? 'rgba(229,72,77,0.15)'
-                          : isDark
-                          ? 'rgba(255,255,255,0.06)'
-                          : 'rgba(0,0,0,0.04)',
+                        color: item.user_liked ? '#E5484D' : theme.fg,
                       },
                     ]}
                   >
-                    <Icons.heart
-                      size={18}
-                      color={item.user_liked ? '#E5484D' : theme.fg}
-                      filled={item.user_liked}
-                    />
-                    <Text
-                      style={[
-                        styles.likeCount,
-                        {
-                          color: item.user_liked ? '#E5484D' : theme.fg,
-                        },
-                      ]}
-                    >
-                      {item.like_count || 0}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <Text style={[styles.timeText, { color: theme.fgMuted }]}>
-                    {new Date(item.created_at).toLocaleDateString()}
+                    {item.like_count || 0}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
+
+                <Text style={[styles.timeText, { color: theme.fgMuted }]}>
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Text>
+              </View>
             </GlassCard>
           ))
         ) : (

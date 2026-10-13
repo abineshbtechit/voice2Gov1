@@ -4,7 +4,7 @@ import { useAppTheme } from '../../context/ThemeContext';
 import { Icons } from './Icons';
 import { Radius } from '../../theme/tokens';
 
-export type TabKey = 'home' | 'complaints' | 'voice' | 'notifications' | 'profile';
+export type TabKey = 'home' | 'complaints' | 'voice' | 'notifications' | 'feed';
 
 interface BottomNavProps {
   activeTab: TabKey;
@@ -123,15 +123,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         )}
       </TouchableOpacity>
 
-      {/* Profile */}
+      {/* Community Feed */}
       <TouchableOpacity
-        onPress={() => onTabPress('profile')}
+        onPress={() => onTabPress('feed')}
         activeOpacity={0.7}
         style={styles.tabButton}
       >
-        <Icons.user
+        <Icons.users
           size={22}
-          color={activeTab === 'profile' ? theme.fg : theme.fgMuted}
+          color={activeTab === 'feed' ? theme.fg : theme.fgMuted}
         />
       </TouchableOpacity>
     </View>
