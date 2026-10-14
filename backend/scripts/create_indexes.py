@@ -1,6 +1,13 @@
 import asyncio
 import logging
+import sys
+from pathlib import Path
 from typing import Any
+
+# Ensure backend root is in sys.path when script is executed directly
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
 
 from pymongo import ASCENDING, DESCENDING
 from pymongo.asynchronous.database import AsyncDatabase
