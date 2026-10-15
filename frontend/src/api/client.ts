@@ -1,10 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { getPlatformApiHost } from '../utils/platform';
 
-const API_BASE_URL =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:8000/api/v1'
-    : 'http://localhost:8000/api/v1';
+const API_BASE_URL = getPlatformApiHost();
 
 export const ACCESS_TOKEN_KEY = '@v2g_access_token';
 export const REFRESH_TOKEN_KEY = '@v2g_refresh_token';
