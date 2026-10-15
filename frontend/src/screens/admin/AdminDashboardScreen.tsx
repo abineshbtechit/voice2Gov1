@@ -17,11 +17,17 @@ import { Radius } from '../../theme/tokens';
 interface AdminDashboardScreenProps {
   onBack: () => void;
   onViewUsers: () => void;
+  onViewAuditLogs?: () => void;
+  onViewSettings?: () => void;
+  onViewCategories?: () => void;
 }
 
 export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   onBack,
   onViewUsers,
+  onViewAuditLogs,
+  onViewSettings,
+  onViewCategories,
 }) => {
   const { theme, isDark } = useAppTheme();
 
@@ -169,21 +175,44 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
               </TouchableOpacity>
             </GlassCard>
 
-            <GlassCard padding={16} radius={Radius.xl}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <GlassCard padding={16} radius={Radius.xl} style={{ marginBottom: 10 }}>
+              <TouchableOpacity
+                onPress={onViewAuditLogs}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Icons.building size={22} color={theme.fg} />
+                  <Icons.clock size={22} color={theme.fg} />
                   <View>
                     <Text style={{ fontSize: 16, fontWeight: '600', color: theme.fg }}>
-                      Organizations & Departments
+                      Audit Trail & Logs
                     </Text>
                     <Text style={{ fontSize: 12, color: theme.fgMuted, marginTop: 2 }}>
-                      Manage municipal authority routing
+                      Inspect immutable system actions and security events
                     </Text>
                   </View>
                 </View>
                 <Icons.chevronRight size={18} color={theme.fgMuted} />
-              </View>
+              </TouchableOpacity>
+            </GlassCard>
+
+            <GlassCard padding={16} radius={Radius.xl} style={{ marginBottom: 10 }}>
+              <TouchableOpacity
+                onPress={onViewSettings}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Icons.settings size={22} color={theme.fg} />
+                  <View>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: theme.fg }}>
+                      System Settings
+                    </Text>
+                    <Text style={{ fontSize: 12, color: theme.fgMuted, marginTop: 2 }}>
+                      Configure SLA rules, rate limits, and priority weights
+                    </Text>
+                  </View>
+                </View>
+                <Icons.chevronRight size={18} color={theme.fgMuted} />
+              </TouchableOpacity>
             </GlassCard>
           </>
         )}

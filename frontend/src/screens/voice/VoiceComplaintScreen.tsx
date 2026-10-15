@@ -87,6 +87,25 @@ export const VoiceComplaintScreen: React.FC<VoiceComplaintScreenProps> = ({
         </TouchableOpacity>
       </View>
 
+      {/* API Key Notice */}
+      {!process.env.EXPO_PUBLIC_AI_TRANSLATION_KEY && (
+        <View
+          style={{
+            marginHorizontal: 20,
+            marginTop: 8,
+            padding: 8,
+            borderRadius: 8,
+            backgroundColor: theme.glassBg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: theme.glassBorder,
+          }}
+        >
+          <Text style={{ fontSize: 11, color: theme.fgMuted, textAlign: 'center', lineHeight: 15 }}>
+            ℹ️ Live Speech-to-Text key required. Add <Text style={{ fontFamily: 'monospace', color: theme.fg }}>EXPO_PUBLIC_AI_TRANSLATION_KEY</Text> in .env. (Using sample civic transcription).
+          </Text>
+        </View>
+      )}
+
       {/* Language Selector Pill */}
       <View style={styles.langPillWrapper}>
         <View

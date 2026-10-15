@@ -27,6 +27,9 @@ import { ProfileScreen } from './src/screens/utility/ProfileScreen';
 import { OrgDashboardScreen } from './src/screens/org/OrgDashboardScreen';
 import { AdminDashboardScreen } from './src/screens/admin/AdminDashboardScreen';
 import { AdminUsersScreen } from './src/screens/admin/AdminUsersScreen';
+import { AdminAuditLogsScreen } from './src/screens/admin/AdminAuditLogsScreen';
+import { AdminSettingsScreen } from './src/screens/admin/AdminSettingsScreen';
+import { ForgotPasswordScreen } from './src/screens/auth/ForgotPasswordScreen';
 import { StateScreen } from './src/screens/states/StateScreen';
 
 // Navigation Components
@@ -39,6 +42,7 @@ type AppScreen =
   | 'login'
   | 'register'
   | 'otp_verification'
+  | 'forgot_password'
   | 'home'
   | 'voice_record'
   | 'text_complaint'
@@ -55,6 +59,8 @@ type AppScreen =
   | 'org_dashboard'
   | 'admin_dashboard'
   | 'admin_users'
+  | 'admin_audit_logs'
+  | 'admin_settings'
   | 'offline_state';
 
 function MainApp() {
@@ -77,7 +83,7 @@ function MainApp() {
   // Sync auth state
   useEffect(() => {
     if (!isAuthenticated) {
-      if (!['welcome', 'login', 'register', 'onboarding', 'otp_verification'].includes(currentScreen)) {
+      if (!['welcome', 'login', 'register', 'onboarding', 'otp_verification', 'forgot_password'].includes(currentScreen)) {
         setCurrentScreen('welcome');
       }
     }
@@ -115,6 +121,14 @@ function MainApp() {
               setVerificationData(data);
               setCurrentScreen('otp_verification');
             }}
+            onForgotPassword={() => setCurrentScreen('forgot_password')}
+          />
+        )}
+
+        {currentScreen === 'forgot_password' && (
+          <ForgotPasswordScreen
+            onBack={() => setCurrentScreen('login')}
+            onSuccess={() => setCurrentScreen('login')}
           />
         )}
 
@@ -304,11 +318,22 @@ function MainApp() {
           <AdminDashboardScreen
             onBack={() => setCurrentScreen('home')}
             onViewUsers={() => setCurrentScreen('admin_users')}
+            onViewAuditLogs={() => setCurrentScreen('admin_audit_logs')}
+            onViewSettings={() => setCurrentScreen('admin_settings')}
+            onViewCategories={() => setCurrentScreen('categories')}
           />
         )}
 
         {currentScreen === 'admin_users' && (
           <AdminUsersScreen onBack={() => setCurrentScreen('admin_dashboard')} />
+        )}
+
+        {currentScreen === 'admin_audit_logs' && (
+          <AdminAuditLogsScreen onBack={() => setCurrentScreen('admin_dashboard')} />
+        )}
+
+        {currentScreen === 'admin_settings' && (
+          <AdminSettingsScreen onBack={() => setCurrentScreen('admin_dashboard')} />
         )}
       </View>
 

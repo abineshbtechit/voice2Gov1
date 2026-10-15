@@ -18,12 +18,14 @@ interface LoginScreenProps {
     phone?: string;
     fullName?: string;
   }) => void;
+  onForgotPassword?: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
   onBack,
   onSuccess,
   onNavigateToVerification,
+  onForgotPassword,
 }) => {
   const { theme, isDark } = useAppTheme();
   const { login } = useAuth();
@@ -122,6 +124,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             onChangeText={setPassword}
             secureTextEntry
           />
+          {onForgotPassword && (
+            <TouchableOpacity
+              onPress={onForgotPassword}
+              style={{ alignSelf: 'flex-end', marginTop: 10, paddingVertical: 4 }}
+            >
+              <Text style={{ fontSize: 13, color: theme.fgMuted, fontWeight: '500' }}>
+                Forgot Password?
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {error && (
