@@ -4,13 +4,11 @@ export const isWeb = Platform.OS === 'web';
 export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';
 
-const FALLBACK_DEV_IP = '10.100.107.81';
-
 /**
  * Dynamically retrieves the development host IP address.
- * 1. Web: uses window.location.hostname
- * 2. Expo Go (Mobile): dynamically extracts PC's IP from Metro bundler's scriptURL
- * 3. Fallback: current known IP (10.100.107.81)
+ * 1. Web: uses window.location.hostname (works on localhost or LAN)
+ * 2. Expo Go (Mobile): dynamically extracts PC's connected IP from Metro bundler's scriptURL
+ * 3. Fallback: 'localhost'
  */
 export const getDynamicHost = (): string => {
   if (isWeb) {
@@ -28,7 +26,7 @@ export const getDynamicHost = (): string => {
     }
   }
 
-  return FALLBACK_DEV_IP;
+  return 'localhost';
 };
 
 export const getPlatformApiHost = (): string => {

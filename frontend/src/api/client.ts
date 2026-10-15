@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getPlatformApiHost } from '../utils/platform';
 
-const API_BASE_URL = getPlatformApiHost();
+export const getApiBaseUrl = () => getPlatformApiHost();
 
 export const ACCESS_TOKEN_KEY = '@v2g_access_token';
 export const REFRESH_TOKEN_KEY = '@v2g_refresh_token';
@@ -32,7 +32,7 @@ export class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${getApiBaseUrl()}${endpoint}`;
     const defaultHeaders = await this.getAuthHeaders();
 
     const config: RequestInit = {
@@ -109,7 +109,7 @@ export class ApiClient {
       const refreshToken = await AsyncStorage.getItem(REFRESH_TOKEN_KEY);
       if (!refreshToken) return false;
 
-      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      const response = await fetch(`${getApiBaseUrl()}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -174,7 +174,7 @@ export class ApiClient {
     });
     formData.append('image_type', 'evidence');
 
-    const res = await fetch(`${API_BASE_URL}/complaints/${complaintId}/images`, {
+    const res = await fetch(`${getApiBaseUrl()}/complaints/${complaintId}/images`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
