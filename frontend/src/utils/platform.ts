@@ -1,5 +1,7 @@
 import { NativeModules, Platform } from 'react-native';
 
+import API_URL from '../config/api';
+
 export const isWeb = Platform.OS === 'web';
 export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';
@@ -29,17 +31,11 @@ export const getDynamicHost = (): string => {
   return 'localhost';
 };
 
+/**
+ * Returns the centralized API Base URL.
+ * All API networking routes through frontend/src/config/api.ts.
+ */
 export const getPlatformApiHost = (): string => {
-  // Check if an explicit EXPO_PUBLIC_API_URL is provided (sanitize double http:// if any)
-  const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) {
-    const cleaned = envUrl.replace(/^(https?:\/\/)+/, 'http://').replace(/\/+$/, '');
-    if (cleaned && cleaned !== 'http://') {
-      return cleaned;
-    }
-  }
-
-  const host = getDynamicHost();
-  return `http://${host}:8000/api/v1`;
+  return API_URL;
 };
 

@@ -47,9 +47,17 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json" if docs_enabled else None,
     )
 
+    # In development, dynamically permit local network origins (LAN, Waydroid, emulator)
+    dev_cors_origin_regex = (
+        r"https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?"
+        if settings.environment.strip().lower() != "production"
+        else None
+    )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
+        allow_origin_regex=dev_cors_origin_regex,
         allow_credentials=settings.cors_allow_credentials,
         allow_methods=settings.cors_allow_methods,
         allow_headers=settings.cors_allow_headers,
@@ -73,6 +81,16 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(api_router)
+
+    @app.get("/health", tags=["health"])
+    async def root_health() -> dict[str, str]:
+        """Simple health check probe indicating backend availability."""
+        return {
+            "status": "ok",
+            "app": settings.app_name,
+            "version": settings.app_version,
+            "environment": settings.environment,
+        }
 
     @app.get("/", include_in_schema=False)
     async def root() -> dict[str, str]:
